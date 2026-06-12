@@ -99,9 +99,8 @@ export default function SolarPark() {
   const canEdit = useMemo(() => {
     try {
       const p = new URLSearchParams(window.location.search);
-      if(!p.has("edit")) return true; // no token param = edit mode (add ?edit=TOKEN to restrict)
       return p.get("edit") === EDIT_TOKEN;
-    } catch(e) { return true; }
+    } catch(e) { return false; }
   }, []);
   const TABLES = useMemo(() => buildTables(), []);
   const [phases, setPhases] = useState(null);
