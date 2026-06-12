@@ -114,6 +114,9 @@ export default function SolarPark() {
   const [subAssignMode, setSubAssignMode] = useState(false);
   const [subAssignId, setSubAssignId]     = useState(null);
   const [showSubs, setShowSubs]           = useState(true);
+  const [collapsePhases, setCollapsePhases] = useState(false);
+  const [collapseSubcons, setCollapseSubcons] = useState(false);
+  const [collapseMvps, setCollapseMvps]   = useState(false);
   const [subFilter, setSubFilter]         = useState(null); 
   const [showPhases, setShowPhases]       = useState(true);
   const [showMvps, setShowMvps]           = useState(true); 
@@ -131,11 +134,13 @@ export default function SolarPark() {
   const vRef        = useRef({ x:10, y:10, z:1.0 });
   const dragStart   = useRef(null);
   const total = TABLES.length;
+  const [labelTick, setLabelTick] = useState(0);
   const applyTransform = useCallback(() => {
     if(svgGroupRef.current) {
       const {x,y,z} = vRef.current;
       svgGroupRef.current.setAttribute('transform', `translate(${x},${y}) scale(${z})`);
     }
+    setLabelTick(t => t+1);
   }, []);
   useEffect(() => {
     setSyncStatus("loading");
@@ -207,7 +212,7 @@ export default function SolarPark() {
   const pvPendingInsp = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) === 5).length, [phases]);
   const pvDone        = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) === 6).length, [phases]);
   const pvExecuted    = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) >= 5).length, [phases]); 
-  const mwp  = ((pvDone*30*615)/1e6).toFixed(3);
+  const mwp  = ((pvDone*30*615)/1e6).toFixed(2);
   const pct  = (pvDone/total*100).toFixed(1);
   const milestoneReached = pvExecuted >= MILESTONE_TABLES;
   const milestonePct = Math.min(pvExecuted/(MILESTONE_TABLES||1)*100, 100).toFixed(1);
@@ -220,13 +225,21 @@ export default function SolarPark() {
     schedulePush([{ id, phase: paintPhase, subcontractor: getSubForTable(id) }]);
   }, [paintPhase, schedulePush, getSubForTable]);
   const addToSub = useCallback((subId, tid) => {
-    setSubs(prev => prev.map(s => s.id!==subId ? s : {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]}));
+    setSubs(prev => prev.map(s =>
+      s.id === subId
+        ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]}
+        : {...s, tables: s.tables.filter(x => x !== tid)} // remove from all others
+    ));
     schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor: subId }]);
   }, [phases, schedulePush]);
   const toggleSubTable = useCallback((subId, tid) => {
     setSubs(prev => {
-      const next = prev.map(s => s.id!==subId ? s : {...s, tables: s.tables.includes(tid) ? s.tables.filter(x=>x!==tid) : [...s.tables,tid]});
-      const nowAssigned = next.find(s=>s.id===subId)?.tables.includes(tid);
+      const alreadyOwned = prev.find(s => s.id === subId)?.tables.includes(tid);
+      const next = prev.map(s => {
+        if(s.id === subId) return {...s, tables: alreadyOwned ? s.tables.filter(x=>x!==tid) : [...s.tables, tid]};
+        return {...s, tables: s.tables.filter(x => x !== tid)}; // exclusive
+      });
+      const nowAssigned = !alreadyOwned;
       schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor: nowAssigned ? subId : "" }]);
       return next;
     });
@@ -402,9 +415,8 @@ export default function SolarPark() {
     return { polygons:result, centroids };
   }, [TABLES]);
   const subColorMap = useMemo(() => {
-    if(!showSubs) return {};
     const m={}; subs.forEach(s=>s.tables.forEach(tid=>{m[tid]=s.color;})); return m;
-  }, [subs, showSubs]);
+  }, [subs]);
   const addSub = () => {
     const name=newSubName.trim(); if(!name) return;
     const cols=["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6"];
@@ -437,7 +449,7 @@ export default function SolarPark() {
               <div style={{color:"#555",fontSize:8}}>{s.l} ✓</div>
             </div>
           ))}
-          <span style={{color:"#22c55e",fontWeight:700,fontSize:12,borderLeft:"1px solid #1e1e35",paddingLeft:10}}>{mwp} / {TOTAL_MWP} MWp</span>
+          <span style={{color:"#22c55e",fontWeight:700,fontSize:12,borderLeft:"1px solid #1e1e35",paddingLeft:10}}>{mwp} / {TOTAL_MWP.toFixed(2)} MWp</span>
           <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,
             background: syncStatus==="ok"?"#0a1a0a": syncStatus==="saving"?"#0f0f1a": syncStatus==="error"?"#1a0a0a":"#0f0f1a",
             color:       syncStatus==="ok"?"#22c55e": syncStatus==="saving"?"#818cf8": syncStatus==="error"?"#f87171":"#555",
@@ -457,7 +469,7 @@ export default function SolarPark() {
       {tab==="map" && (
         <div style={{display:"flex",flex:1,overflow:"hidden"}}>
           {}
-          <div style={{width:192,background:"#0f0f1c",borderRight:"1px solid #1e1e35",overflowY:"auto",flexShrink:0,padding:"8px 7px"}}>
+          <div style={{width:210,background:"#0f0f1c",borderRight:"1px solid #1e1e35",overflowY:"auto",flexShrink:0,padding:"8px 7px"}}>
             {}
             <div style={{marginBottom:8,padding:"7px 8px",background:milestoneReached?"#0d2010":"#0d0d1a",borderRadius:5,border:`1px solid ${milestoneReached?"#22c55e44":"#1e1e35"}`}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:milestoneReached?"#22c55e":"#666",marginBottom:3,fontWeight:700}}>
@@ -486,7 +498,7 @@ export default function SolarPark() {
             <div style={{marginBottom:6,padding:"7px 8px",background:paintMode?"#0a120a":"#0d0d1a",border:`1px solid ${paintMode?"#22c55e55":"#1e1e35"}`,borderRadius:5}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:paintMode?6:0}}>
                 <span style={{fontSize:9,color:paintMode?"#22c55e":"#666",fontWeight:700,letterSpacing:1}}>🎨 PAINT MODE</span>
-                <button onClick={()=>{setPaintMode(m=>!m); setSubAssignMode(false);}}
+                <button onClick={()=>{setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); } return next; });}}
                   style={{background:paintMode?"#22c55e":"#1e1e35",border:"none",color:paintMode?"#000":"#888",borderRadius:3,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:700}}>
                   {paintMode?"ON ✓":"OFF"}
                 </button>
@@ -508,124 +520,179 @@ export default function SolarPark() {
             </div>
             {}
             <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-              <span style={{fontSize:9,color:"#888",letterSpacing:1,fontWeight:700}}>PHASES</span>
-              <button onClick={()=>setShowPhases(s=>!s)}
-                style={{background:showPhases?"#1e1e35":"transparent",border:"1px solid #2d2d4a",color:showPhases?"#aaa":"#555",borderRadius:3,padding:"1px 7px",cursor:"pointer",fontSize:9,fontWeight:700}}>
-                {showPhases?"ON":"OFF"}
-              </button>
-            </div>
-            {PHASES.map(p=>(
-              <div key={p.id} onClick={()=>setPf(pf===p.id?null:p.id)}
-                style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
-                  background:pf===p.id?"#1e1e35":"transparent",border:`1px solid ${pf===p.id?"#2d2d4a":"transparent"}`}}>
-                <div style={{width:18,height:6,borderRadius:1,background:p.color,border:`1px solid ${p.border}`,flexShrink:0}}/>
-                <span style={{flex:1,fontSize:9,color:"#ccc"}}>{p.label}</span>
-                <span style={{fontSize:10,fontWeight:700,color:stats[p.id]>0?(p.id===6?phaseColors.pv:"#ddd"):"#333",minWidth:20,textAlign:"right"}}>{stats[p.id]}</span>
+            {/* ── PHASES ── */}
+            <div style={{marginBottom:2}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",cursor:"pointer"}}
+                onClick={()=>setCollapsePhases(s=>!s)}>
+                <span style={{fontSize:10,color:"#aaa",letterSpacing:1,fontWeight:700}}>PHASES {collapsePhases?"▸":"▾"}</span>
+                <button onClick={e=>{e.stopPropagation();setShowPhases(s=>!s);}}
+                  style={{background:showPhases?"#818cf8":"#1e1e35",border:`1px solid ${showPhases?"#818cf8":"#2d2d4a"}`,color:showPhases?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                  {showPhases?"ON":"OFF"}
+                </button>
               </div>
-            ))}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8,marginBottom:showColorPicker?5:6}}>
-              <span style={{fontSize:8,color:"#444",letterSpacing:1}}>PHASE COLORS</span>
-              <button onClick={()=>setShowColorPicker(s=>!s)}
-                style={{display:"flex",alignItems:"center",gap:3,background:"transparent",border:"1px solid #2d2d4a",borderRadius:3,padding:"1px 6px",cursor:"pointer"}}>
-                {["sp","ms","pv"].map(k=>(
-                  <div key={k} style={{width:8,height:8,borderRadius:1,background:phaseColors[k]}}/>
-                ))}
-                <span style={{fontSize:8,color:"#666",marginLeft:2}}>{showColorPicker?"▲":"▼"}</span>
-              </button>
-            </div>
-            {showColorPicker && [
-              {key:"sp", label:"Screwpiles",      presets:["#dc2626","#e11d48","#b91c1c","#7c3aed","#0891b2"]},
-              {key:"ms", label:"Mounting System",  presets:["#ea580c","#d97706","#65a30d","#0d9488","#7c3aed"]},
-              {key:"pv", label:"PV Panels",         presets:["#2563eb","#0284c7","#0891b2","#7c3aed","#db2777"]},
-            ].map(g=>(
-              <div key={g.key} style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-                <span style={{fontSize:8,color:"#777",width:54,flexShrink:0}}>{g.label}</span>
-                <input type="color" value={phaseColors[g.key]}
-                  onChange={e=>setPhaseColors(c=>({...c,[g.key]:e.target.value}))}
-                  style={{width:22,height:18,padding:0,border:"none",borderRadius:3,cursor:"pointer",background:"none"}}/>
-                <div style={{display:"flex",gap:2}}>
-                  {g.presets.map(col=>(
-                    <div key={col} onClick={()=>setPhaseColors(c=>({...c,[g.key]:col}))}
-                      style={{width:12,height:12,borderRadius:2,background:col,cursor:"pointer",
-                        outline:phaseColors[g.key]===col?"2px solid #fff":"none",outlineOffset:1}}/>
-                  ))}
+              {!collapsePhases && <>
+                <div style={{display:"flex",padding:"1px 4px",marginBottom:2}}>
+                  <div style={{width:22,flexShrink:0}}/>
+                  <span style={{flex:1}}/>
+                  <span style={{fontSize:8,color:"#333",width:24,textAlign:"right",flexShrink:0}}>tables</span>
+                  <span style={{fontSize:8,color:"#333",width:32,textAlign:"right",flexShrink:0}}>MWp</span>
                 </div>
-              </div>
-            ))}
-            {}
+                {PHASES.map(p=>{
+                  const groupKey = p.id<=2?"sp":p.id<=4?"ms":"pv";
+                  const isOpen = colorPickerId===`phase_${groupKey}`;
+                  const PRESETS = {
+                    sp:["#dc2626","#e11d48","#b91c1c","#f97316","#7c3aed","#0891b2"],
+                    ms:["#ea580c","#d97706","#65a30d","#0d9488","#7c3aed","#e11d48"],
+                    pv:["#2563eb","#0284c7","#0891b2","#7c3aed","#db2777","#65a30d"],
+                  };
+                  return (
+                    <div key={p.id}>
+                      <div onClick={()=>setPf(pf===p.id?null:p.id)}
+                        style={{display:"flex",alignItems:"flex-start",gap:7,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
+                          background:pf===p.id?"#1a1a2e":"transparent",
+                          border:`1px solid ${pf===p.id?p.border+"88":"transparent"}`}}>
+                        <div
+                          onClick={e=>{e.stopPropagation(); setColorPickerId(isOpen?null:`phase_${groupKey}`);}}
+                          style={{width:22,height:8,borderRadius:2,background:p.color,border:`1px solid ${p.border}`,flexShrink:0,marginTop:1,cursor:"pointer",
+                            outline:isOpen?"2px solid #fff":"none",outlineOffset:1}}/>
+                        <span style={{flex:1,fontSize:9,color:"#bbb",lineHeight:1.35}}>{p.label}</span>
+                        <span style={{fontSize:9,color:"#555",width:24,textAlign:"right",flexShrink:0,marginTop:1}}>{stats[p.id]}</span>
+                        <span style={{fontSize:8,color:"#444",width:32,textAlign:"right",flexShrink:0,marginTop:2}}>{(stats[p.id]*30*615/1e6).toFixed(2)}</span>
+                      </div>
+                      {isOpen && (
+                        <div style={{padding:"5px 6px 6px",marginBottom:3,background:"#12121f",borderRadius:4,border:"1px solid #2d2d4a"}}>
+                          <div style={{fontSize:8,color:"#555",marginBottom:4}}>Color for {groupKey==="sp"?"Screwpiles":groupKey==="ms"?"Mounting System":"PV Panels"} (both phases)</div>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                            <input type="color" value={phaseColors[groupKey]}
+                              onChange={e=>setPhaseColors(c=>({...c,[groupKey]:e.target.value}))}
+                              style={{width:22,height:18,padding:0,border:"none",borderRadius:3,cursor:"pointer",background:"none",flexShrink:0}}/>
+                            {PRESETS[groupKey].map(col=>(
+                              <div key={col} onClick={()=>{setPhaseColors(c=>({...c,[groupKey]:col})); setColorPickerId(null);}}
+                                style={{width:14,height:14,borderRadius:2,background:col,cursor:"pointer",flexShrink:0,
+                                  outline:phaseColors[groupKey]===col?"2px solid #fff":"none",outlineOffset:1}}/>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>}
+            </div>
+            {/* ── SUBCONS ── */}
             {subs.length > 0 && <>
               <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <span style={{fontSize:9,color:"#888",letterSpacing:1,fontWeight:700}}>SUBCONS</span>
-                <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                  <button onClick={()=>{setSubAssignMode(m=>{ const next=!m; if(next) setShowSubs(true); return next; }); setPaintMode(false);}}
-                    style={{background:subAssignMode?"#818cf8":"#1e1e35",border:"1px solid #2d2d4a",color:subAssignMode?"#000":"#888",borderRadius:3,padding:"1px 7px",cursor:"pointer",fontSize:9,fontWeight:700}}>
-                    {subAssignMode?"ASSIGN ✓":"ASSIGN"}
-                  </button>
-                  <button onClick={()=>setShowSubs(s=>!s)}
-                    style={{background:showSubs?"#1e1e35":"transparent",border:"1px solid #2d2d4a",color:showSubs?"#aaa":"#555",borderRadius:3,padding:"1px 7px",cursor:"pointer",fontSize:9,fontWeight:700}}>
-                    {showSubs?"ON":"OFF"}
-                  </button>
+              <div style={{marginBottom:2}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",cursor:"pointer"}}
+                  onClick={()=>setCollapseSubcons(s=>!s)}>
+                  <span style={{fontSize:10,color:"#aaa",letterSpacing:1,fontWeight:700}}>SUBCONS {collapseSubcons?"▸":"▾"}</span>
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    <button onClick={e=>{e.stopPropagation(); setSubAssignMode(m=>{ const next=!m; if(next) setShowSubs(true); return next; }); setPaintMode(false);}}
+                      style={{background:subAssignMode?"#818cf8":"#1e1e35",border:`1px solid ${subAssignMode?"#818cf8":"#2d2d4a"}`,color:subAssignMode?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                      {subAssignMode?"ASSIGN ✓":"ASSIGN"}
+                    </button>
+                    <button onClick={e=>{e.stopPropagation(); setShowSubs(s=>{ const next=!s; if(!next) setSubAssignMode(false); return next; });}}
+                      style={{background:showSubs?"#818cf8":"#1e1e35",border:`1px solid ${showSubs?"#818cf8":"#2d2d4a"}`,color:showSubs?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                      {showSubs?"ON":"OFF"}
+                    </button>
+                  </div>
                 </div>
+                {!collapseSubcons && <>
+                  <div style={{display:"flex",padding:"1px 4px",marginBottom:3}}>
+                    <div style={{width:23,flexShrink:0}}/>
+                    <span style={{flex:1}}/>
+                    <span style={{fontSize:8,color:"#333",width:24,textAlign:"right",flexShrink:0}}>tables</span>
+                    <span style={{fontSize:8,color:"#333",width:32,textAlign:"right",flexShrink:0}}>MWp</span>
+                  </div>
+                  {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
+                  {subs.map(s => {
+                    const mwp = (s.tables.length * 30 * 615 / 1e6).toFixed(2);
+                    const isTarget = subAssignId === s.id;
+                    const isFiltered = subFilter === s.id;
+                    const isColorOpen = colorPickerId === `sidebar_${s.id}`;
+                    const SUB_PRESETS = ["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#e53e3e","#2b6cb0","#276749","#dd6b20"];
+                    return (
+                      <div key={s.id}>
+                        <div onClick={()=>{ if(subAssignMode) setSubAssignId(id=>id===s.id?null:s.id); else setSubFilter(f=>f===s.id?null:s.id); }}
+                          style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
+                            background:isTarget?"#1e1a2e":isFiltered?"#1a1a2e":"transparent",
+                            border:`1px solid ${isTarget?s.color+"cc":isFiltered?s.color+"55":"transparent"}`,
+                            opacity:!subAssignMode&&subFilter!==null&&!isFiltered?0.35:1}}>
+                          <div onClick={e=>{e.stopPropagation(); setColorPickerId(isColorOpen?null:`sidebar_${s.id}`);}}
+                            style={{width:18,height:8,borderRadius:2,flexShrink:0,cursor:"pointer",
+                              background:"transparent",border:`2px solid ${s.color}`,
+                              outline:isColorOpen?"2px solid #fff":"none",outlineOffset:1}}/>
+                          <span style={{flex:1,fontSize:10,color:isTarget?"#fff":"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:isTarget?700:400}}>{s.name}</span>
+                          <span style={{fontSize:10,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{s.tables.length}</span>
+                          <span style={{fontSize:9,color:"#444",width:32,textAlign:"right",flexShrink:0}}>{mwp}</span>
+                        </div>
+                        {isColorOpen && (
+                          <div style={{padding:"5px 6px 6px",marginBottom:3,background:"#12121f",borderRadius:4,border:`1px solid ${s.color}44`}}>
+                            <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                              <input type="color" value={s.color}
+                                onChange={e=>setSubs(prev=>prev.map(x=>x.id===s.id?{...x,color:e.target.value}:x))}
+                                style={{width:22,height:18,padding:0,border:"none",borderRadius:3,cursor:"pointer",background:"none",flexShrink:0}}/>
+                              {SUB_PRESETS.map(col=>(
+                                <div key={col} onClick={()=>{setSubs(prev=>prev.map(x=>x.id===s.id?{...x,color:col}:x)); setColorPickerId(null);}}
+                                  style={{width:14,height:14,borderRadius:2,background:"transparent",border:`2px solid ${col}`,cursor:"pointer",flexShrink:0,
+                                    outline:s.color===col?"2px solid #fff":"none",outlineOffset:1}}/>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(()=>{
+                    const assigned = new Set(subs.flatMap(s=>s.tables));
+                    const unassigned = TABLES.filter(t=>!assigned.has(t.id)).length;
+                    const uMwp = (unassigned*30*615/1e6).toFixed(2);
+                    return (
+                      <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginTop:2,borderTop:"1px solid #1a1a2e",paddingTop:4}}>
+                        <div style={{width:18,height:8,borderRadius:2,background:"#2d2d4a",flexShrink:0,border:"1px solid #3a3a5a"}}/>
+                        <span style={{flex:1,fontSize:10,color:"#555"}}>Unassigned</span>
+                        <span style={{fontSize:10,color:"#444",width:28,textAlign:"right",flexShrink:0}}>{unassigned}</span>
+                        <span style={{fontSize:9,color:"#333",width:38,textAlign:"right",flexShrink:0}}>{uMwp}</span>
+                      </div>
+                    );
+                  })()}
+                </>}
               </div>
-              {subAssignMode && <div style={{fontSize:8,color:"#555",marginBottom:4}}>Click or drag to assign · Right-click to unassign</div>}
-              {subs.map(s => {
-                const mwp = (s.tables.length * 30 * 615 / 1e6).toFixed(2);
-                const isTarget = subAssignId === s.id;
-                const isFiltered = subFilter === s.id;
-                return (
-                  <div key={s.id}
-                    onClick={()=>{
-                      if(subAssignMode) setSubAssignId(id=>id===s.id?null:s.id);
-                      else setSubFilter(f=>f===s.id?null:s.id);
-                    }}
-                    style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
-                      background:(isTarget||isFiltered)?"#1a1a2e":"transparent",
-                      border:`1px solid ${isTarget?s.color+"cc":isFiltered?s.color+"88":"transparent"}`,
-                      opacity:!subAssignMode&&subFilter!==null&&!isFiltered?0.35:1}}>
-                    <div style={{width:18,height:6,borderRadius:1,background:s.color,flexShrink:0,border:`1px solid ${s.color}88`}}/>
-                    <span style={{flex:1,fontSize:9,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
-                    <span style={{fontSize:8,color:"#555",whiteSpace:"nowrap"}}>{s.tables.length}</span>
-                    {isTarget && <span style={{fontSize:8,color:s.color}}>✓</span>}
-                  </div>
-                );
-              })}
-              {(()=>{
-                const assigned = new Set(subs.flatMap(s=>s.tables));
-                const unassigned = TABLES.filter(t=>!assigned.has(t.id)).length;
-                return (
-                  <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginTop:2,borderTop:"1px solid #1a1a2e",paddingTop:4}}>
-                    <div style={{width:18,height:6,borderRadius:1,background:"#2d2d4a",flexShrink:0,border:"1px solid #3a3a5a"}}/>
-                    <span style={{flex:1,fontSize:9,color:"#555"}}>Unassigned</span>
-                    <span style={{fontSize:8,color:"#444"}}>{unassigned}</span>
-                  </div>
-                );
-              })()}
             </>}
-            {}
+            {/* ── MVPS ── */}
             <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-              <span style={{fontSize:9,color:"#888",letterSpacing:1,fontWeight:700}}>MVPS</span>
-              <button onClick={()=>setShowMvps(s=>!s)}
-                style={{background:showMvps?"#1e1e35":"transparent",border:"1px solid #2d2d4a",color:showMvps?"#aaa":"#555",borderRadius:3,padding:"1px 7px",cursor:"pointer",fontSize:9,fontWeight:700}}>
-                {showMvps?"ON":"OFF"}
-              </button>
-            </div>
-            {showMvps && [1,2,3,4,5,6,7,8,9].map(mv=>{
-              const bt=TABLES.filter(t=>t.m===mv);
-              const done=bt.filter(t=>(phases[t.id]||0)===6).length;
-              const pct=(done/bt.length*100).toFixed(0);
-              return (
-                <div key={mv} onClick={()=>setBf(bf===mv?null:mv)}
-                  style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
-                    background:bf===mv?"#1e1e35":"transparent",border:`1px solid ${bf===mv?"#2d2d4a":"transparent"}`}}>
-                  <div style={{width:18,height:6,borderRadius:1,background:BC[mv],flexShrink:0,border:`1px solid ${BC[mv]}88`}}/>
-                  <span style={{flex:1,fontSize:9,color:"#ccc"}}>MVPS {mv}</span>
-                  <span style={{fontSize:10,fontWeight:700,color:done>0?"#ddd":"#333",minWidth:20,textAlign:"right"}}>{bt.length}</span>
+            <div style={{marginBottom:2}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",cursor:"pointer"}}
+                onClick={()=>setCollapseMvps(s=>!s)}>
+                <span style={{fontSize:10,color:"#aaa",letterSpacing:1,fontWeight:700}}>MVPS {collapseMvps?"▸":"▾"}</span>
+                <button onClick={e=>{e.stopPropagation(); setShowMvps(s=>!s);}}
+                  style={{background:showMvps?"#818cf8":"#1e1e35",border:`1px solid ${showMvps?"#818cf8":"#2d2d4a"}`,color:showMvps?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                  {showMvps?"ON":"OFF"}
+                </button>
+              </div>
+              {!collapseMvps && <>
+                <div style={{display:"flex",padding:"1px 4px",marginBottom:3}}>
+                  <div style={{width:23,flexShrink:0}}/>
+                  <span style={{flex:1}}/>
+                  <span style={{fontSize:8,color:"#333",width:24,textAlign:"right",flexShrink:0}}>tables</span>
+                  <span style={{fontSize:8,color:"#333",width:32,textAlign:"right",flexShrink:0}}>MWp</span>
                 </div>
-              );
-            })}
+                {[1,2,3,4,5,6,7,8,9].map(mv=>{
+                  const bt=TABLES.filter(t=>t.m===mv);
+                  const mwp=(bt.length*30*615/1e6).toFixed(2);
+                  return (
+                    <div key={mv} onClick={()=>setBf(bf===mv?null:mv)}
+                      style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
+                        background:bf===mv?"#1e1e35":"transparent",border:`1px solid ${bf===mv?"#2d2d4a":"transparent"}`}}>
+                      <div style={{width:18,height:8,borderRadius:2,background:BC[mv],flexShrink:0,border:`1px solid ${BC[mv]}88`}}/>
+                      <span style={{flex:1,fontSize:9,color:"#ccc"}}>MVPS {mv}</span>
+                      <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{bt.length}</span>
+                      <span style={{fontSize:8,color:"#444",width:32,textAlign:"right",flexShrink:0}}>{mwp}</span>
+                    </div>
+                  );
+                })}
+              </>}
+            </div>
             <div style={{marginTop:8,padding:6,background:"#0d0d1a",borderRadius:4,border:"1px solid #1a1a2e",fontSize:8,color:"#444",lineHeight:1.9}}>
               🖱 Click = next phase<br/>
               🖱 Right-click = phase menu<br/>
@@ -650,26 +717,27 @@ export default function SolarPark() {
                 <rect x={-5} y={-5} width={CW+10} height={CH+10} fill="#0d0d14"/>
                 {showMvps && Object.entries(hulls.polygons).map(([mv,pts])=>(
                   <polygon key={`bg${mv}`} points={pts}
-                    fill={`${BC[+mv]}${bf===+mv?"10":"06"}`}
-                    stroke={`${BC[+mv]}${bf===+mv?"cc":"28"}`}
+                    fill={`${BC[+mv]}${bf===+mv?"22":"18"}`}
+                    stroke={`${BC[+mv]}${bf===+mv?"dd":"55"}`}
                     strokeWidth={bf===+mv?0.5:0.3}/>
                 ))}
                 {TABLES.map(t=>{
                   const ph=Math.min((phases[t.id]||0), PHASES.length-1), p=PHASES[ph];
                   const subCol = subColorMap[t.id];
-                  const phaseDim = (pf!==null&&ph!==pf)||(bf!==null&&t.m!==bf);
+                  const phaseDim = showPhases && ((pf!==null&&ph!==pf)||(bf!==null&&t.m!==bf));
                   const subDim = showSubs && subFilter !== null && !subs.find(s=>s.id===subFilter)?.tables.includes(t.id);
                   const dim = phaseDim || subDim;
-                  const fillColor = !showPhases ? PHASES[0].color : (dim?"#141420":p.color);
-                  const strokeColor = !showPhases ? PHASES[0].border : (dim?"#1a1a26":(subCol&&showSubs?subCol:p.border));
-                  const opacity = !showPhases ? 1 : (dim?0.15:1);
+                  // Subcons = border only. Fill = phase color (or not-started when phases OFF).
+                  const fillColor = dim ? PHASES[0].color : showPhases ? p.color : PHASES[0].color;
+                  const strokeColor = (showSubs && subCol && !dim) ? subCol : PHASES[0].border;
+                  const strokeW = (showSubs && subCol && !dim) ? 0.6 : 0.15;
+                  const opacity = 1;
                   return (
                     <rect key={t.id} data-id={t.id}
                       x={t.x+ROX} y={t.y+ROY} width={RW} height={RH} rx={0.5}
                       fill={fillColor}
                       stroke={strokeColor}
-                      strokeWidth={subCol&&showSubs?1.2:ph===6?0.5:0.25}
-                      opacity={opacity}
+                      strokeWidth={strokeW}
                       style={{cursor:subAssignMode?"cell":paintMode?"crosshair":"pointer"}}
                       onClick={e=>click(t.id,e)}
                       onContextMenu={e=>rclick(t.id,e)}
@@ -678,14 +746,25 @@ export default function SolarPark() {
                   );
                 })}
                 {}
-                {showMvps && Object.entries(hulls.centroids).map(([mv,[cx,cy]])=>(
-                  <text key={`lb${mv}`} x={cx} y={cy}
-                    textAnchor="middle" fontSize={6} fill={`${BC[+mv]}ee`} fontWeight="bold"
-                    stroke="#0d0d14" strokeWidth={2} paintOrder="stroke"
-                    style={{pointerEvents:"none",userSelect:"none"}}>MVPS {mv}</text>
-                ))}
               </g>
             </svg>
+            {/* MVPS labels as fixed-size DOM overlay */}
+            {showMvps && Object.entries(hulls.centroids).map(([mv,[cx,cy]])=>{
+              const {x,y,z} = vRef.current;
+              const sx = cx*z + x;
+              const sy = cy*z + y;
+              void labelTick;
+              return (
+                <div key={`lbl${mv}`} style={{
+                  position:"absolute", left:sx, top:sy,
+                  transform:"translate(-50%,-50%)",
+                  pointerEvents:"none", userSelect:"none",
+                  fontSize:11, fontWeight:800, color:BC[+mv],
+                  textShadow:"0 0 4px #0d0d14, 0 0 8px #0d0d14, 1px 1px 0 #0d0d14, -1px -1px 0 #0d0d14",
+                  letterSpacing:0.5, whiteSpace:"nowrap",
+                }}>MVPS {mv}</div>
+              );
+            })}
             {}
             {tooltip && !paintMode && !subAssignMode && (
               <div style={{position:"fixed",left:tooltip.x+12,top:tooltip.y-8,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100,boxShadow:"0 4px 16px rgba(0,0,0,.7)"}}>
@@ -735,14 +814,14 @@ export default function SolarPark() {
             {(() => {
               const assignedSet = new Set(subs.flatMap(s=>s.tables));
               const unassigned = TABLES.filter(t=>!assignedSet.has(t.id)).length;
-              const unassignedMwp = (unassigned*30*615/1e6).toFixed(3);
+              const unassignedMwp = (unassigned*30*615/1e6).toFixed(2);
               return (
                 <div style={{display:"flex",gap:10,marginBottom:16,padding:"10px 16px",background:"#12121f",borderRadius:7,border:"1px solid #1e1e35",alignItems:"center"}}>
                   <span style={{fontSize:12,color:"#666"}}>Unassigned tables:</span>
                   <span style={{fontSize:14,fontWeight:700,color:unassigned===0?"#22c55e":"#f87171"}}>{unassigned}</span>
                   <span style={{fontSize:12,color:"#555"}}>·</span>
                   <span style={{fontSize:12,color:"#888"}}>{unassignedMwp} MWp</span>
-                  <span style={{fontSize:12,color:"#444",marginLeft:"auto"}}>{TABLES.length} total · {(TABLES.length*30*615/1e6).toFixed(3)} MWp</span>
+                  <span style={{fontSize:12,color:"#444",marginLeft:"auto"}}>{TABLES.length} total · {(TABLES.length*30*615/1e6).toFixed(2)} MWp</span>
                 </div>
               );
             })()}
@@ -754,9 +833,11 @@ export default function SolarPark() {
             )}
             {subs.map(sub=>{
               const assigned=sub.tables.length;
+              const msDone=sub.tables.filter(tid=>(phases[tid]||0)>=3).length;
               const done=sub.tables.filter(tid=>(phases[tid]||0)===6).length;
-              const mwpSub=(assigned*30*615/1e6).toFixed(3);
-              const doneMwp=(done*30*615/1e6).toFixed(3);
+              const mwpSub=(assigned*30*615/1e6).toFixed(2);
+              const doneMwp=(done*30*615/1e6).toFixed(2);
+              const msDoneMwp=(msDone*30*615/1e6).toFixed(2);
               const PRESET_COLORS=["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6","#38bdf8","#4ade80","#facc15"];
               return (
                 <div key={sub.id} style={{background:"#12121f",border:`1px solid ${sub.color}22`,borderRadius:8,marginBottom:14,overflow:"hidden"}}>
@@ -768,6 +849,7 @@ export default function SolarPark() {
                     <span style={{flex:1,fontWeight:700,fontSize:15,color:"#fff"}}>{sub.name}</span>
                     <span style={{fontSize:12,color:"#555"}}>{assigned} tables</span>
                     <span style={{fontSize:12,color:"#888"}}>{mwpSub} MWp</span>
+                    <span style={{fontSize:12,color:phaseColors.ms}}>{msDone} MS ✓ ({msDoneMwp} MWp)</span>
                     <span style={{fontSize:12,color:"#22c55e"}}>{done} PV ✓ ({doneMwp} MWp)</span>
                     {confirmRemove===sub.id ? (
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -792,28 +874,16 @@ export default function SolarPark() {
                   {}
                   {assigned>0 && (
                     <div style={{padding:"6px 16px",borderBottom:"1px solid #1e1e35"}}>
-                      <div style={{height:4,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:(done/assigned*100)+"%",background:"#22c55e",borderRadius:2,transition:"width .3s"}}/>
+                      <div style={{height:4,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginBottom:3,position:"relative"}}>
+                        <div style={{position:"absolute",height:"100%",width:(msDone/assigned*100)+"%",background:phaseColors.ms,borderRadius:2}}/>
+                        <div style={{position:"absolute",height:"100%",width:(done/assigned*100)+"%",background:"#22c55e",borderRadius:2}}/>
                       </div>
-                      <div style={{fontSize:9,color:"#555",marginTop:2}}>{(done/assigned*100).toFixed(1)}% PV approved</div>
+                      <div style={{display:"flex",gap:12,fontSize:9,color:"#555"}}>
+                        <span style={{color:phaseColors.ms}}>{(msDone/assigned*100).toFixed(1)}% MS executed</span>
+                        <span style={{color:"#22c55e"}}>{(done/assigned*100).toFixed(1)}% PV approved</span>
+                      </div>
                     </div>
                   )}
-                  {}
-                  <div style={{padding:"10px 16px"}}>
-                    <div style={{fontSize:9,color:"#555",marginBottom:6}}>Quick-assign whole MVPS blocks:</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                      {[1,2,3,4,5,6,7,8,9].map(mv=>{
-                        const mvT=TABLES.filter(t=>t.m===mv).map(t=>t.id);
-                        const all=mvT.every(tid=>sub.tables.includes(tid));
-                        return (
-                          <button key={mv} onClick={()=>setSubs(prev=>prev.map(s=>s.id!==sub.id?s:{...s,tables:all?s.tables.filter(t=>!mvT.includes(t)):[...new Set([...s.tables,...mvT])]}))}
-                            style={{background:all?"#1e2a1e":"#1a1a2e",border:`1px solid ${all?"#22c55e55":"#2d2d4a"}`,color:all?"#22c55e":"#777",borderRadius:4,padding:"3px 10px",cursor:"pointer",fontSize:10}}>
-                            {all?"✓ ":"+ "}MVPS {mv} ({TABLES.filter(t=>t.m===mv).length})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
               );
             })}
@@ -828,7 +898,7 @@ export default function SolarPark() {
         const msPend = msPendingInsp, msApp = msDone - msPendingInsp;
         const pvPend = pvPendingInsp, pvApp = pvDone;
         const notStarted = stats[0];
-        const totalMwpInstalled = (pvExecuted * mwpPerTable).toFixed(3);
+        const totalMwpInstalled = (pvExecuted * mwpPerTable).toFixed(2);
         const Card = ({title, children, accent="#f87171"}) => (
           <div style={{background:"#12121f",border:`1px solid ${accent}22`,borderRadius:8,padding:"14px 16px",marginBottom:0}}>
             <div style={{fontSize:10,color:accent,fontWeight:700,letterSpacing:1,marginBottom:10}}>{title}</div>
@@ -857,9 +927,9 @@ export default function SolarPark() {
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
                 {[
                   {label:"Total tables",    val:T.toLocaleString(),         sub:"",                 color:"#555"},
-                  {label:"Total capacity",  val:`${TOTAL_MWP} MWp`,         sub:"65,017,800 Wp",    color:"#555"},
+                  {label:"Total capacity",  val:`${TOTAL_MWP.toFixed(2)} MWp`,         sub:"65,017,800 Wp",    color:"#555"},
                   {label:"PV installed",    val:`${totalMwpInstalled} MWp`, sub:`${pvExecuted} tables`,  color:phaseColors.pv},
-                  {label:"Remaining",       val:`${(TOTAL_MWP-+totalMwpInstalled).toFixed(3)} MWp`, sub:`${T-pvExecuted} tables`, color:phaseColors.sp},
+                  {label:"Remaining",       val:`${(TOTAL_MWP-+totalMwpInstalled).toFixed(2)} MWp`, sub:`${T-pvExecuted} tables`, color:phaseColors.sp},
                 ].map(k=>(
                   <div key={k.label} style={{background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px"}}>
                     <div style={{fontSize:9,color:"#555",letterSpacing:1,marginBottom:4}}>{k.label.toUpperCase()}</div>
@@ -870,7 +940,7 @@ export default function SolarPark() {
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
                 {}
-                <Card title="🔩 SCREWPILES" accent={phaseColors.sp}>
+                <Card title="🔩 Screwpiles" accent={phaseColors.sp}>
                   <Row label="Approved" val={spApp} sub={`${(spApp/T*100).toFixed(1)}%`} bar={spApp} barColor={phaseColors.sp} barMax={T}/>
                   <Row label="Pending inspection" val={spPend} sub={`${(spPend/T*100).toFixed(1)}%`} bar={spPend} barColor={phaseColors.sp} barMax={T} indent/>
                   <Row label="Not started" val={T-spApp-spPend} sub={`${((T-spApp-spPend)/T*100).toFixed(1)}%`}/>
@@ -879,7 +949,7 @@ export default function SolarPark() {
                   <Row label="Total pending MWp"  val={`${(spPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                 </Card>
                 {}
-                <Card title="🏗 MOUNTING STRUCTURE" accent={phaseColors.ms}>
+                <Card title="🏗 Mounting System" accent={phaseColors.ms}>
                   <Row label="Approved" val={msApp} sub={`${(msApp/T*100).toFixed(1)}%`} bar={msApp} barColor={phaseColors.ms} barMax={T}/>
                   <Row label="Pending inspection" val={msPend} sub={`${(msPend/T*100).toFixed(1)}%`} bar={msPend} barColor={phaseColors.ms} barMax={T} indent/>
                   <Row label="Not started" val={T-msApp-msPend} sub={`${((T-msApp-msPend)/T*100).toFixed(1)}%`}/>
@@ -888,7 +958,7 @@ export default function SolarPark() {
                   <Row label="Total pending MWp"  val={`${(msPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                 </Card>
                 {}
-                <Card title="☀ PV PANELS" accent={phaseColors.pv}>
+                <Card title="☀ PV Panels" accent={phaseColors.pv}>
                   <Row label="Approved" val={pvApp} sub={`${(pvApp/T*100).toFixed(1)}%`} bar={pvApp} barColor={phaseColors.pv} barMax={T}/>
                   <Row label="Pending inspection" val={pvPend} sub={`${(pvPend/T*100).toFixed(1)}%`} bar={pvPend} barColor={phaseColors.pv} barMax={T} indent/>
                   <Row label="Not started" val={T-pvApp-pvPend} sub={`${((T-pvApp-pvPend)/T*100).toFixed(1)}%`}/>
