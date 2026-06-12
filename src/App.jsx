@@ -299,7 +299,7 @@ export default function SolarPark() {
     e.stopPropagation();
     if(subAssignMode && subAssignId) { toggleSubTable(subAssignId, id); return; }
     if(paintMode) { applyPhase(id); return; }
-    const newPh = Math.min((phases?.[id]||0)+1, 6);
+    const newPh = ((phases?.[id]||0)+1) % 7;
     setPhases(p => ({...p, [id]: newPh}));
     schedulePush([{ id, phase: newPh, subcontractor: getSubForTable(id) }]);
   }, [paintMode, applyPhase, subAssignMode, subAssignId, toggleSubTable, phases, schedulePush, getSubForTable]);
@@ -930,52 +930,86 @@ export default function SolarPark() {
               </div>
             )}
             {subs.map(sub=>{
-              const assigned=sub.tables.length;
+              const assigned   = sub.tables.length;
               const contracted = sub.contracted || 0;
               const contractedMwp = (contracted*30*615/1e6).toFixed(2);
-              const msDone=sub.tables.filter(tid=>(phases[tid]||0)>=3).length;
-              const done=sub.tables.filter(tid=>(phases[tid]||0)===6).length;
-              const mwpSub=(assigned*30*615/1e6).toFixed(2);
-              const doneMwp=(done*30*615/1e6).toFixed(2);
-              const PRESET_COLORS=["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6","#38bdf8","#4ade80","#facc15"];
-              const isDragOver = dragOverSubId === sub.id;
+              const msDone = sub.tables.filter(tid=>(phases[tid]||0)>=3).length;
+              const done   = sub.tables.filter(tid=>(phases[tid]||0)===6).length;
+              const mwpSub = (assigned*30*615/1e6).toFixed(2);
+              const PRESET_COLORS = ["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6","#38bdf8","#4ade80","#facc15"];
+              const isDragOver  = dragOverSubId === sub.id;
               const overAssigned = contracted>0 && assigned>contracted;
+              const msP = assigned>0 ? (msDone/assigned*100).toFixed(0) : 0;
+              const pvP = assigned>0 ? (done/assigned*100).toFixed(0) : 0;
               return (
                 <div key={sub.id}
                   draggable={canEdit}
-                  onDragStart={e=>{ if(!canEdit) return; e.dataTransfer.setData("subId", sub.id); e.dataTransfer.effectAllowed="move"; }}
+                  onDragStart={e=>{ if(!canEdit) return; e.dataTransfer.setData("subId",sub.id); e.dataTransfer.effectAllowed="move"; }}
                   onDragOver={e=>{ if(!canEdit) return; e.preventDefault(); setDragOverSubId(sub.id); }}
                   onDragLeave={()=>setDragOverSubId(null)}
                   onDrop={e=>{ if(!canEdit) return; e.preventDefault(); setDragOverSubId(null); const fromId=e.dataTransfer.getData("subId"); if(fromId===sub.id) return; setSubs(prev=>{ const arr=[...prev]; const fi=arr.findIndex(s=>s.id===fromId); const ti=arr.findIndex(s=>s.id===sub.id); const [item]=arr.splice(fi,1); arr.splice(ti,0,item); return arr; }); }}
-                  style={{background:"#0f0f1c",border:`1px solid ${isDragOver?sub.color+"66":"#1e1e35"}`,borderLeft:`3px solid ${sub.color}`,borderRadius:5,marginBottom:8,cursor:canEdit?"grab":"default"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #1a1a2e"}}>
-                    <div onClick={()=>setColorPickerId(colorPickerId===sub.id?null:sub.id)}
-                      style={{width:10,height:10,borderRadius:2,background:sub.color,flexShrink:0,cursor:"pointer",
-                        outline:colorPickerId===sub.id?"2px solid #fff":"none",outlineOffset:1}}/>
-                    <span style={{flex:1,fontWeight:700,fontSize:13,color:"#e0e0e8"}}>{sub.name}</span>
+                  style={{background:"#0f0f1c",border:`1px solid ${isDragOver?sub.color+"66":"#1e1e35"}`,borderLeft:`3px solid ${sub.color}`,borderRadius:5,marginBottom:6,padding:"8px 12px",cursor:canEdit?"grab":"default",display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+                  {/* Color swatch / picker */}
+                  <div onClick={()=>setColorPickerId(colorPickerId===sub.id?null:sub.id)}
+                    style={{width:10,height:10,borderRadius:2,background:sub.color,flexShrink:0,cursor:"pointer",
+                      outline:colorPickerId===sub.id?"2px solid #fff":"none",outlineOffset:1}}/>
+                  {/* Name */}
+                  <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",minWidth:70,flexShrink:0}}>{sub.name}</span>
+                  {/* Divider */}
+                  <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
+                  {/* Contracted */}
+                  <div style={{textAlign:"center",minWidth:64,flexShrink:0}}>
                     {canEdit ? (
-                      <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                        <span style={{fontSize:9,color:"#555"}}>Contracted:</span>
-                        <input type="number" min={0} value={contracted||""} placeholder="—"
-                          onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,contracted:+e.target.value||0}:s))}
-                          onClick={e=>e.stopPropagation()}
-                          style={{width:50,background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#ccc",borderRadius:3,padding:"1px 5px",fontSize:10,outline:"none",textAlign:"center"}}/>
-                      </div>
-                    ) : contracted>0 && (
-                      <span style={{fontSize:10,color:"#777"}}>Contracted: {contracted}</span>
-                    )}
-                    {canEdit && (confirmRemove===sub.id ? (
-                      <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                        <span style={{fontSize:10,color:"#f87171"}}>Remove?</span>
-                        <button onClick={()=>removeSub(sub.id)} style={{background:"#7f1d1d",border:"1px solid #f87171",color:"#fca5a5",borderRadius:3,padding:"1px 6px",cursor:"pointer",fontSize:10}}>Yes</button>
-                        <button onClick={()=>setConfirmRemove(null)} style={{background:"transparent",border:"1px solid #2d2d2d",color:"#555",borderRadius:3,padding:"1px 6px",cursor:"pointer",fontSize:10}}>No</button>
-                      </div>
+                      <input type="number" min={0} value={contracted||""} placeholder="—"
+                        onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,contracted:+e.target.value||0}:s))}
+                        onClick={e=>e.stopPropagation()}
+                        style={{width:52,background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#ccc",borderRadius:3,padding:"2px 5px",fontSize:12,outline:"none",textAlign:"center",display:"block",margin:"0 auto 2px"}}/>
                     ) : (
-                      <button onClick={()=>setConfirmRemove(sub.id)} style={{background:"transparent",border:"none",color:"#2d2d4a",padding:"0 2px",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>
-                    ))}
+                      <div style={{fontSize:14,fontWeight:500,color:"#888",marginBottom:2}}>{contracted||"—"}</div>
+                    )}
+                    <div style={{fontSize:9,color:"#555"}}>Contracted</div>
+                    {contracted>0 && <div style={{fontSize:9,color:"#444"}}>{contractedMwp} MWp</div>}
                   </div>
+                  {/* Divider */}
+                  <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
+                  {/* Assigned */}
+                  <div style={{textAlign:"center",minWidth:64,flexShrink:0}}>
+                    <div style={{fontSize:14,fontWeight:500,color:overAssigned?"#f87171":"#e0e0e8",marginBottom:2}}>{assigned}</div>
+                    <div style={{fontSize:9,color:"#555"}}>Assigned</div>
+                    <div style={{fontSize:9,color:"#444"}}>{mwpSub} MWp</div>
+                  </div>
+                  {/* Divider */}
+                  <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
+                  {/* Bars */}
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:5}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:10,color:"#555",width:20,flexShrink:0}}>MS</span>
+                      <div style={{flex:1,height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:msP+"%",background:phaseColors.ms,borderRadius:2}}/>
+                      </div>
+                      <span style={{fontSize:10,color:"#666",width:28,textAlign:"right",flexShrink:0}}>{msP}%</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:10,color:"#555",width:20,flexShrink:0}}>PV</span>
+                      <div style={{flex:1,height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:pvP+"%",background:"#22c55e",borderRadius:2}}/>
+                      </div>
+                      <span style={{fontSize:10,color:"#666",width:28,textAlign:"right",flexShrink:0}}>{pvP}%</span>
+                    </div>
+                  </div>
+                  {/* Remove */}
+                  {canEdit && (confirmRemove===sub.id ? (
+                    <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                      <span style={{fontSize:10,color:"#f87171"}}>Remove?</span>
+                      <button onClick={()=>removeSub(sub.id)} style={{background:"#7f1d1d",border:"1px solid #f87171",color:"#fca5a5",borderRadius:3,padding:"1px 6px",cursor:"pointer",fontSize:10}}>Yes</button>
+                      <button onClick={()=>setConfirmRemove(null)} style={{background:"transparent",border:"1px solid #2d2d2d",color:"#555",borderRadius:3,padding:"1px 6px",cursor:"pointer",fontSize:10}}>No</button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>setConfirmRemove(sub.id)} style={{background:"transparent",border:"none",color:"#2d2d4a",padding:"0 2px",cursor:"pointer",fontSize:14,lineHeight:1,flexShrink:0}}>✕</button>
+                  ))}
+                  {/* Color picker dropdown */}
                   {colorPickerId===sub.id && (
-                    <div style={{padding:"6px 12px",borderBottom:"1px solid #1a1a2e",display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                    <div style={{position:"absolute",marginTop:36,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:5,padding:"8px",zIndex:100,display:"flex",gap:5,flexWrap:"wrap",width:200}}>
                       <input type="color" value={sub.color}
                         onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,color:e.target.value}:s))}
                         style={{width:20,height:16,padding:0,border:"none",cursor:"pointer",background:"none",flexShrink:0}}/>
@@ -983,47 +1017,6 @@ export default function SolarPark() {
                         <div key={c} onClick={()=>{ setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,color:c}:s)); setColorPickerId(null); }}
                           style={{width:16,height:16,borderRadius:3,background:c,cursor:"pointer",border:`2px solid ${sub.color===c?"#fff":"transparent"}`,flexShrink:0}}/>
                       ))}
-                    </div>
-                  )}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",padding:"6px 12px 4px",borderBottom:contracted>0||assigned>0?"1px solid #1a1a2e":"none"}}>
-                    {[
-                      {label:"Contracted", val:contracted||"—", sub2:contracted>0?contractedMwp+" MWp":"", color:"#888"},
-                      {label:"Assigned",   val:assigned,        sub2:mwpSub+" MWp",  color:overAssigned?"#f87171":"#888"},
-                      {label:"MS done",    val:msDone,          sub2:assigned>0?(msDone/assigned*100).toFixed(0)+"%":"", color:phaseColors.ms},
-                      {label:"PV done",    val:done,            sub2:doneMwp+" MWp", color:"#22c55e"},
-                    ].map(k=>(
-                      <div key={k.label} style={{textAlign:"center",padding:"2px 0"}}>
-                        <div style={{fontSize:16,fontWeight:700,color:k.color}}>{k.val}</div>
-                        <div style={{fontSize:8,color:"#555"}}>{k.label}</div>
-                        <div style={{fontSize:8,color:"#444"}}>{k.sub2}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {(contracted>0 || assigned>0) && (
-                    <div style={{padding:"5px 12px 7px"}}>
-                      {contracted>0 && (
-                        <div style={{marginBottom:3}}>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:8,color:"#555",marginBottom:1}}>
-                            <span>Assigned / contracted</span>
-                            <span style={{color:assigned>=contracted?"#22c55e":"#f5a623"}}>{assigned}/{contracted}</span>
-                          </div>
-                          <div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
-                            <div style={{height:"100%",width:Math.min(assigned/(contracted||1)*100,100)+"%",background:assigned>=contracted?"#22c55e":"#f5a623",borderRadius:2}}/>
-                          </div>
-                        </div>
-                      )}
-                      {assigned>0 && (
-                        <div>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:8,color:"#555",marginBottom:1}}>
-                            <span>Execution (MS / PV)</span>
-                          </div>
-                          <div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden",position:"relative"}}>
-                            <div style={{position:"absolute",height:"100%",width:(msDone/assigned*100)+"%",background:phaseColors.ms,borderRadius:2}}/>
-                            <div style={{position:"absolute",height:"100%",width:(done/assigned*100)+"%",background:"#22c55e",borderRadius:2}}/>
-                          </div>
-                        </div>
-                      )}
-                      {overAssigned && <div style={{fontSize:9,color:"#f87171",marginTop:3}}>⚠ Assigned ({assigned}) exceeds contracted ({contracted})</div>}
                     </div>
                   )}
                 </div>
@@ -1104,25 +1097,86 @@ export default function SolarPark() {
                   <Row label="Total pending MWp"  val={`${(pvPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                 </Card>
               </div>
-              <Card title="🏆 80% PV MILESTONE" accent={milestoneReached?"#2563eb":"#fb923c"}>
-                <div style={{display:"flex",gap:20,alignItems:"center"}}>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginBottom:4}}>
-                      <span>Progress toward 80% target</span>
-                      <span style={{color:milestoneReached?"#60a5fa":"#fb923c",fontWeight:700}}>{milestoneReached?"✓ REACHED":milestonePct+"%"}</span>
+              {/* ── 80% and 100% Target Cards ── */}
+              {(()=>{
+                const msExec = msExecuted;
+                const pvExec = pvExecuted;
+                const ms80Target = Math.ceil(T*0.8);
+                const pv80Target = MILESTONE_TABLES;
+                const msTo80  = Math.max(0, ms80Target - msExec);
+                const msTo100 = Math.max(0, T - msExec);
+                const pvTo80  = Math.max(0, pv80Target - pvExec);
+                const pvTo100 = Math.max(0, T - pvExec);
+                const reached80ms = msTo80===0, reached80pv = pvTo80===0;
+                const reached100ms = msTo100===0, reached100pv = pvTo100===0;
+                const ProgressBar = ({exec, target, color, label}) => {
+                  const pct = Math.min(exec/target*100, 100);
+                  return (
+                    <div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#666",marginBottom:3}}>
+                        <span style={{color:"#888"}}>{label}: {Math.min(exec,target).toLocaleString()} / {target.toLocaleString()}</span>
+                        <span style={{color,fontWeight:700}}>{pct.toFixed(1)}%</span>
+                      </div>
+                      <div style={{height:6,background:"#1a1a2e",borderRadius:3,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:pct+"%",background:color,borderRadius:3}}/>
+                      </div>
                     </div>
-                    <div style={{height:8,background:"#1a1a2e",borderRadius:4,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:milestonePct+"%",background:milestoneReached?"#2563eb":"#fb923c",borderRadius:4,transition:"width .3s"}}/>
+                  );
+                };
+                return (
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                    {/* 80% card */}
+                    <div style={{background: reached80ms&&reached80pv?"#0a1a0a":"#0d0d1a", border:`1px solid ${reached80ms&&reached80pv?"#22c55e44":"#1e1e35"}`,borderRadius:8,padding:"14px 16px"}}>
+                      <div style={{fontSize:10,color:reached80ms&&reached80pv?"#22c55e":"#fb923c",fontWeight:700,letterSpacing:1,marginBottom:10}}>
+                        {reached80ms&&reached80pv?"✓ 80% TARGET REACHED":"🎯 TO REACH 80% TARGET"}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+                        <div style={{background:"#12121f",borderRadius:6,padding:"10px 12px",textAlign:"center"}}>
+                          <div style={{fontSize:10,color:"#666",marginBottom:3}}>🏗 MS remaining</div>
+                          <div style={{fontSize:26,fontWeight:700,color:reached80ms?"#22c55e":phaseColors.ms,lineHeight:1.1}}>{reached80ms?"✓":msTo80.toLocaleString()}</div>
+                          {!reached80ms && <><div style={{fontSize:11,color:"#888"}}>tables</div><div style={{fontSize:11,color:"#555"}}>{(msTo80*mwpPerTable).toFixed(2)} MWp</div></>}
+                          {reached80ms && <div style={{fontSize:11,color:"#22c55e"}}>target reached</div>}
+                        </div>
+                        <div style={{background:"#12121f",borderRadius:6,padding:"10px 12px",textAlign:"center"}}>
+                          <div style={{fontSize:10,color:"#666",marginBottom:3}}>☀ PV remaining</div>
+                          <div style={{fontSize:26,fontWeight:700,color:reached80pv?"#22c55e":phaseColors.pv,lineHeight:1.1}}>{reached80pv?"✓":pvTo80.toLocaleString()}</div>
+                          {!reached80pv && <><div style={{fontSize:11,color:"#888"}}>tables</div><div style={{fontSize:11,color:"#555"}}>{(pvTo80*mwpPerTable).toFixed(2)} MWp</div></>}
+                          {reached80pv && <div style={{fontSize:11,color:"#22c55e"}}>target reached</div>}
+                        </div>
+                      </div>
+                      <ProgressBar exec={msExec} target={ms80Target} color={phaseColors.ms} label="MS"/>
+                      <div style={{marginTop:8}}>
+                        <ProgressBar exec={pvExec} target={pv80Target} color={phaseColors.pv} label="PV"/>
+                      </div>
                     </div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#666",marginTop:3}}>
-                      <span>{pvApp} / {MILESTONE_TABLES} tables</span>
-                      <span>{totalMwpInstalled} / {MILESTONE_MWP} MWp</span>
+                    {/* 100% card */}
+                    <div style={{background: reached100ms&&reached100pv?"#0a1a0a":"#0d0d1a", border:`1px solid ${reached100ms&&reached100pv?"#22c55e44":"#1e1e35"}`,borderRadius:8,padding:"14px 16px"}}>
+                      <div style={{fontSize:10,color:reached100ms&&reached100pv?"#22c55e":"#aaa",fontWeight:700,letterSpacing:1,marginBottom:10}}>
+                        {reached100ms&&reached100pv?"✓ 100% COMPLETE":"🏆 TO REACH 100%"}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+                        <div style={{background:"#12121f",borderRadius:6,padding:"10px 12px",textAlign:"center"}}>
+                          <div style={{fontSize:10,color:"#666",marginBottom:3}}>🏗 MS remaining</div>
+                          <div style={{fontSize:26,fontWeight:700,color:reached100ms?"#22c55e":phaseColors.ms,lineHeight:1.1}}>{reached100ms?"✓":msTo100.toLocaleString()}</div>
+                          {!reached100ms && <><div style={{fontSize:11,color:"#888"}}>tables</div><div style={{fontSize:11,color:"#555"}}>{(msTo100*mwpPerTable).toFixed(2)} MWp</div></>}
+                          {reached100ms && <div style={{fontSize:11,color:"#22c55e"}}>complete</div>}
+                        </div>
+                        <div style={{background:"#12121f",borderRadius:6,padding:"10px 12px",textAlign:"center"}}>
+                          <div style={{fontSize:10,color:"#666",marginBottom:3}}>☀ PV remaining</div>
+                          <div style={{fontSize:26,fontWeight:700,color:reached100pv?"#22c55e":phaseColors.pv,lineHeight:1.1}}>{reached100pv?"✓":pvTo100.toLocaleString()}</div>
+                          {!reached100pv && <><div style={{fontSize:11,color:"#888"}}>tables</div><div style={{fontSize:11,color:"#555"}}>{(pvTo100*mwpPerTable).toFixed(2)} MWp</div></>}
+                          {reached100pv && <div style={{fontSize:11,color:"#22c55e"}}>complete</div>}
+                        </div>
+                      </div>
+                      <ProgressBar exec={msExec} target={T} color={phaseColors.ms} label="MS"/>
+                      <div style={{marginTop:8}}>
+                        <ProgressBar exec={pvExec} target={T} color={phaseColors.pv} label="PV"/>
+                      </div>
                     </div>
                   </div>
-                  {milestoneReached && <div style={{fontSize:32}}>🏆</div>}
-                </div>
-              </Card>
-              <div style={{marginTop:12}}>
+                );
+              })()}
+              <div style={{marginTop:0}}>
                 <Card title="📡 BREAKDOWN BY MVPS BLOCK" accent="#818cf8">
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
@@ -1178,47 +1232,58 @@ export default function SolarPark() {
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                         <thead>
                           <tr style={{color:"#555",fontSize:9}}>
-                            {["Subcontractor","Tables","MWp","MS ✓","%","PV ✓","%","PV MWp"].map(h=>(
+                            {["Subcontractor","Contracted","Assigned","Asgn %","MWp","MS ✓","MS %","PV ✓","PV %","PV MWp"].map(h=>(
                               <th key={h} style={{textAlign:h==="Subcontractor"?"left":"right",padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {subs.map(sub=>{
-                            const n=sub.tables.length;
-                            const mwpS=(n*mwpPerTable).toFixed(2);
-                            const ms=sub.tables.filter(id=>(phases[id]||0)>=3).length;
-                            const pv=sub.tables.filter(id=>(phases[id]||0)>=5).length;
+                            const n   = sub.tables.length;
+                            const ctr = sub.contracted||0;
+                            const mwpS= (n*mwpPerTable).toFixed(2);
+                            const ms  = sub.tables.filter(id=>(phases[id]||0)>=3).length;
+                            const pv  = sub.tables.filter(id=>(phases[id]||0)>=5).length;
                             const pvMwp=(pv*mwpPerTable).toFixed(2);
+                            const asgnPct = ctr>0 ? Math.round(n/ctr*100)+"%" : "—";
+                            const over = ctr>0 && n>ctr;
                             return (
                               <tr key={sub.id} style={{borderTop:"1px solid #1a1a2e"}}>
-                                <td style={{padding:"5px 8px",display:"flex",alignItems:"center",gap:6}}>
-                                  <div style={{width:8,height:8,borderRadius:2,background:sub.color,flexShrink:0}}/>
-                                  <span style={{color:"#ccc"}}>{sub.name}</span>
+                                <td style={{padding:"5px 8px"}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                    <div style={{width:8,height:8,borderRadius:2,background:sub.color,flexShrink:0}}/>
+                                    <span style={{color:"#ccc"}}>{sub.name}</span>
+                                  </div>
                                 </td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:"#888"}}>{n}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:"#888"}}>{ctr||"—"}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:over?"#f87171":"#888"}}>{n}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:over?"#f87171":"#666"}}>{asgnPct}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#888"}}>{mwpS}</td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:PHASES[4].color}}>{ms}</td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:"#555"}}>{n?Math.round(ms/n*100):0}%</td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:PHASES[6].color}}>{pv}</td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:"#555"}}>{n?Math.round(pv/n*100):0}%</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:phaseColors.ms}}>{ms}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:"#666"}}>{n?Math.round(ms/n*100):0}%</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:phaseColors.pv}}>{pv}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:"#666"}}>{n?Math.round(pv/n*100):0}%</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#aaa"}}>{pvMwp}</td>
                               </tr>
                             );
                           })}
                           <tr style={{borderTop:"2px solid #2d2d4a",fontWeight:700}}>
-                            <td style={{padding:"5px 8px",color:"#ccc"}}>TOTAL (assigned)</td>
+                            <td style={{padding:"5px 8px",color:"#ccc"}}>TOTAL</td>
                             {(()=>{
-                              const allT=[...new Set(subs.flatMap(s=>s.tables))];
-                              const n=allT.length;
-                              const ms=allT.filter(id=>(phases[id]||0)>=3).length;
-                              const pv=allT.filter(id=>(phases[id]||0)>=5).length;
+                              const totCtr = subs.reduce((a,s)=>a+(s.contracted||0),0);
+                              const allT   = [...new Set(subs.flatMap(s=>s.tables))];
+                              const n      = allT.length;
+                              const ms     = allT.filter(id=>(phases[id]||0)>=3).length;
+                              const pv     = allT.filter(id=>(phases[id]||0)>=5).length;
+                              const asgnPct= totCtr>0 ? Math.round(n/totCtr*100)+"%" : "—";
                               return (<>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:"#ccc"}}>{totCtr||"—"}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#ccc"}}>{n}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:"#666"}}>{asgnPct}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#ccc"}}>{(n*mwpPerTable).toFixed(2)}</td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:PHASES[4].color}}>{ms}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:phaseColors.ms}}>{ms}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#666"}}>{n?Math.round(ms/n*100):0}%</td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:PHASES[6].color}}>{pv}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:phaseColors.pv}}>{pv}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#666"}}>{n?Math.round(pv/n*100):0}%</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#aaa"}}>{(pv*mwpPerTable).toFixed(2)}</td>
                               </>);
