@@ -125,6 +125,7 @@ export default function SolarPark() {
   const [phaseOpacity, setPhaseOpacity] = useState({sp:1, ms:1, pv:1});
   const [newSubName, setNewSubName]   = useState("");
   const [confirmRemove, setConfirmRemove] = useState(null);
+  const [dragOverSubId, setDragOverSubId] = useState(null);
   const [syncStatus, setSyncStatus] = useState("loading"); 
   const [syncMsg, setSyncMsg]       = useState("");
   const pendingSync = useRef([]);   
@@ -760,7 +761,10 @@ export default function SolarPark() {
                   const ph=Math.min((phases[t.id]||0), PHASES.length-1), p=PHASES[ph];
                   const subCol = subColorMap[t.id];
                   const phaseDim = showPhases && ((pf!==null&&ph!==pf)||(bf!==null&&t.m!==bf));
-                  const subDim = showSubs && subFilter !== null && !subs.find(s=>s.id===subFilter)?.tables.includes(t.id);
+                  const subDim = showSubs && (
+                    (subFilter !== null && !subs.find(s=>s.id===subFilter)?.tables.includes(t.id)) ||
+                    (bf !== null && t.m !== bf)
+                  );
                   const dim = phaseDim || subDim;
                   const grp = ph<=2?"sp":ph<=4?"ms":"pv";
                   const opac = ph===0 ? 1 : (phaseOpacity[grp]??1);
@@ -871,9 +875,18 @@ export default function SolarPark() {
               const doneMwp=(done*30*615/1e6).toFixed(2);
               const msDoneMwp=(msDone*30*615/1e6).toFixed(2);
               const PRESET_COLORS=["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6","#38bdf8","#4ade80","#facc15"];
+              const isDragOver = dragOverSubId === sub.id;
               return (
-                <div key={sub.id} style={{background:"#12121f",border:`1px solid ${sub.color}22`,borderRadius:8,marginBottom:14,overflow:"hidden"}}>
+                <div key={sub.id}
+                  draggable
+                  onDragStart={e=>{ e.dataTransfer.setData("subId", sub.id); e.dataTransfer.effectAllowed="move"; }}
+                  onDragOver={e=>{ e.preventDefault(); setDragOverSubId(sub.id); }}
+                  onDragLeave={()=>setDragOverSubId(null)}
+                  onDrop={e=>{ e.preventDefault(); setDragOverSubId(null); const fromId=e.dataTransfer.getData("subId"); if(fromId===sub.id) return; setSubs(prev=>{ const arr=[...prev]; const fi=arr.findIndex(s=>s.id===fromId); const ti=arr.findIndex(s=>s.id===sub.id); const [item]=arr.splice(fi,1); arr.splice(ti,0,item); return arr; }); }}
+                  style={{background:"#12121f",border:`1px solid ${isDragOver?sub.color+"88":sub.color+"22"}`,borderRadius:8,marginBottom:14,overflow:"hidden",
+                    boxShadow:isDragOver?`0 0 0 2px ${sub.color}44`:"none",transition:"box-shadow .15s"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:"1px solid #1e1e35"}}>
+                    <span style={{fontSize:14,color:"#333",cursor:"grab",userSelect:"none",flexShrink:0}} title="Drag to reorder">⠿</span>
                     <div onClick={()=>setColorPickerId(colorPickerId===sub.id?null:sub.id)}
                       style={{width:16,height:16,borderRadius:3,background:sub.color,flexShrink:0,cursor:"pointer",border:"2px solid transparent",boxSizing:"border-box",outline:`2px solid ${colorPickerId===sub.id?sub.color:"transparent"}`,outlineOffset:2}}
                       title="Change color"/>
