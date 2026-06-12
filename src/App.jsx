@@ -96,6 +96,12 @@ function loadLocalConfig() {
   } catch(e) { return { subColors: null, colors: null }; }
 }
 export default function SolarPark() {
+  const canEdit = useMemo(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("edit") === EDIT_TOKEN;
+    } catch(e) { return false; }
+  }, []);
   const TABLES = useMemo(() => buildTables(), []);
   const [phases, setPhases] = useState(null);
   const [subs, setSubs]     = useState([]);
@@ -487,6 +493,11 @@ export default function SolarPark() {
             </div>
           ))}
           <span style={{color:"#22c55e",fontWeight:700,fontSize:12,borderLeft:"1px solid #1e1e35",paddingLeft:10}}>{mwp} / {TOTAL_MWP.toFixed(2)} MWp</span>
+          {!canEdit && (
+            <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,background:"#1a1a0a",color:"#888",border:"1px solid #2d2d1a"}}>
+              👁 View only
+            </div>
+          )}
           <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,
             background: syncStatus==="ok"?"#0a1a0a": syncStatus==="saving"?"#0f0f1a": syncStatus==="error"?"#1a0a0a":"#0f0f1a",
             color:       syncStatus==="ok"?"#22c55e": syncStatus==="saving"?"#818cf8": syncStatus==="error"?"#f87171":"#555",
@@ -497,7 +508,7 @@ export default function SolarPark() {
           <div style={{display:"flex",gap:1,background:"#0d0d14",borderRadius:5,padding:2,marginLeft:4}}>
             {[["map","🗺 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)}
-                style={{background:tab===t?"#1e1e35":"transparent",border:"none",color:tab===t?"#fff":"#555",borderRadius:4,padding:"3px 10px",cursor:"pointer",fontSize:11,fontWeight:tab===t?700:400}}>{l}</button>
+                style={{background:tab===t?"#818cf8":"#1a1a2e",border:`1px solid ${tab===t?"#818cf8":"#2d2d4a"}`,color:tab===t?"#000":"#888",borderRadius:5,padding:"5px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===t?700:500,letterSpacing:0.3,transition:"all .15s"}}>{l}</button>
             ))}
           </div>
         </div>
@@ -530,8 +541,7 @@ export default function SolarPark() {
             <div style={{marginBottom:6,padding:"7px 8px",background:paintMode?"#0a120a":"#0d0d1a",border:`1px solid ${paintMode?"#22c55e55":"#1e1e35"}`,borderRadius:5}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:paintMode?6:0}}>
                 <span style={{fontSize:9,color:paintMode?"#22c55e":"#666",fontWeight:700,letterSpacing:1}}>🎨 PAINT MODE</span>
-                <button onClick={()=>{setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); } return next; });}}
-                  style={{background:paintMode?"#22c55e":"#1e1e35",border:"none",color:paintMode?"#000":"#888",borderRadius:3,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                <button onClick={()=>{if(!canEdit) return; setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); } return next; });}}                  style={{background:paintMode?"#22c55e":"#1e1e35",border:"none",color:paintMode?"#000":"#888",borderRadius:3,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:700}}>
                   {paintMode?"ON ✓":"OFF"}
                 </button>
               </div>
@@ -623,7 +633,7 @@ export default function SolarPark() {
                   onClick={()=>setCollapseSubcons(s=>!s)}>
                   <span style={{fontSize:10,color:"#aaa",letterSpacing:1,fontWeight:700}}>SUBCONS {collapseSubcons?"▸":"▾"}</span>
                   <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                    <button onClick={e=>{e.stopPropagation(); setSubAssignMode(m=>{ const next=!m; if(next) setShowSubs(true); return next; }); setPaintMode(false);}}
+                    <button onClick={e=>{e.stopPropagation(); if(!canEdit) return; setSubAssignMode(m=>{ const next=!m; if(next) setShowSubs(true); return next; }); setPaintMode(false);}}
                       style={{background:subAssignMode?"#818cf8":"#1e1e35",border:`1px solid ${subAssignMode?"#818cf8":"#2d2d4a"}`,color:subAssignMode?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
                       {subAssignMode?"ASSIGN ✓":"ASSIGN"}
                     </button>
@@ -743,11 +753,10 @@ export default function SolarPark() {
             <div style={{marginTop:4,padding:6,background:"#0d0d1a",borderRadius:4,border:"1px solid #1a1a2e",fontSize:8,color:"#444",lineHeight:1.9}}>
               🖱 Click = next phase<br/>
               🖱 Right-click = phase menu<br/>
-              📋 Legend = filter<br/>
               🔍 Scroll = zoom · ✋ Drag
             </div>
           </div>
-          <div ref={canvasRef} style={{flex:1,overflow:"hidden",position:"relative",cursor:subAssignMode?"cell":paintMode?"crosshair":"grab"}}>
+          <div ref={canvasRef} style={{flex:1,overflow:"hidden",position:"relative",cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"grab"):"default"}}>
             <svg width="100%" height="100%">
               <g ref={svgGroupRef} transform="translate(10,10) scale(1)">
                 <rect x={-5} y={-5} width={CW+10} height={CH+10} fill="#0d0d14"/>
@@ -781,9 +790,9 @@ export default function SolarPark() {
                       fillOpacity={fillOpacity}
                       stroke={strokeColor}
                       strokeWidth={strokeW}
-                      style={{cursor:subAssignMode?"cell":paintMode?"crosshair":"pointer"}}
-                      onClick={e=>click(t.id,e)}
-                      onContextMenu={e=>rclick(t.id,e)}
+                      style={{cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"pointer"):"default"}}
+                      onClick={e=>{ if(canEdit) click(t.id,e); }}
+                      onContextMenu={e=>{ if(canEdit) rclick(t.id,e); else e.preventDefault(); }}
                       onMouseEnter={e=>handleEnter(t.id,e)}
                       onMouseLeave={()=>setTooltip(null)}/>
                   );
@@ -844,7 +853,7 @@ export default function SolarPark() {
                 <input value={newSubName} onChange={e=>setNewSubName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
                   placeholder="Subcontractor name…"
                   style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:190}}/>
-                <button onClick={addSub} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:newSubName.trim()?1:0.4}}>+ Add</button>
+                <button onClick={()=>canEdit&&addSub()} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:canEdit&&newSubName.trim()?1:0.4}}>+ Add</button>
               </div>
             </div>
             {(() => {
@@ -878,11 +887,11 @@ export default function SolarPark() {
               const isDragOver = dragOverSubId === sub.id;
               return (
                 <div key={sub.id}
-                  draggable
-                  onDragStart={e=>{ e.dataTransfer.setData("subId", sub.id); e.dataTransfer.effectAllowed="move"; }}
-                  onDragOver={e=>{ e.preventDefault(); setDragOverSubId(sub.id); }}
+                  draggable={canEdit}
+                  onDragStart={e=>{ if(!canEdit) return; e.dataTransfer.setData("subId", sub.id); e.dataTransfer.effectAllowed="move"; }}
+                  onDragOver={e=>{ if(!canEdit) return; e.preventDefault(); setDragOverSubId(sub.id); }}
                   onDragLeave={()=>setDragOverSubId(null)}
-                  onDrop={e=>{ e.preventDefault(); setDragOverSubId(null); const fromId=e.dataTransfer.getData("subId"); if(fromId===sub.id) return; setSubs(prev=>{ const arr=[...prev]; const fi=arr.findIndex(s=>s.id===fromId); const ti=arr.findIndex(s=>s.id===sub.id); const [item]=arr.splice(fi,1); arr.splice(ti,0,item); return arr; }); }}
+                  onDrop={e=>{ if(!canEdit) return; e.preventDefault(); setDragOverSubId(null); const fromId=e.dataTransfer.getData("subId"); if(fromId===sub.id) return; setSubs(prev=>{ const arr=[...prev]; const fi=arr.findIndex(s=>s.id===fromId); const ti=arr.findIndex(s=>s.id===sub.id); const [item]=arr.splice(fi,1); arr.splice(ti,0,item); return arr; }); }}
                   style={{background:"#12121f",border:`1px solid ${isDragOver?sub.color+"88":sub.color+"22"}`,borderRadius:8,marginBottom:14,overflow:"hidden",
                     boxShadow:isDragOver?`0 0 0 2px ${sub.color}44`:"none",transition:"box-shadow .15s"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:"1px solid #1e1e35"}}>
@@ -895,7 +904,7 @@ export default function SolarPark() {
                     <span style={{fontSize:12,color:"#888"}}>{mwpSub} MWp</span>
                     <span style={{fontSize:12,color:phaseColors.ms}}>{msDone} MS ✓ ({msDoneMwp} MWp)</span>
                     <span style={{fontSize:12,color:"#22c55e"}}>{done} PV ✓ ({doneMwp} MWp)</span>
-                    {confirmRemove===sub.id ? (
+                    {canEdit && (confirmRemove===sub.id ? (
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
                         <span style={{fontSize:11,color:"#f87171"}}>Remove?</span>
                         <button onClick={()=>removeSub(sub.id)} style={{background:"#7f1d1d",border:"1px solid #f87171",color:"#fca5a5",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontSize:11}}>Yes</button>
@@ -903,7 +912,7 @@ export default function SolarPark() {
                       </div>
                     ) : (
                       <button onClick={()=>setConfirmRemove(sub.id)} style={{background:"transparent",border:"1px solid #2d2d2d",color:"#555",borderRadius:4,padding:"2px 7px",cursor:"pointer",fontSize:11}}>✕</button>
-                    )}
+                    ) )}
                   </div>
                   {colorPickerId===sub.id && (
                     <div style={{padding:"8px 16px",borderBottom:"1px solid #1e1e35",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
