@@ -548,10 +548,13 @@ export default function SolarPark() {
           {milestoneReached && <span style={{fontSize:10,background:"#0d2010",color:"#22c55e",border:"1px solid #22c55e55",padding:"2px 8px",borderRadius:10,fontWeight:700}}>🏆 80% PV Milestone reached!</span>}
         </div>
         <div style={{display:"flex",gap:12,alignItems:"center"}}>
-          {[{l:"SP",v:(spExecuted/total*100).toFixed(1)+"%",c:phaseColors.sp},{l:"MS",v:(msExecuted/total*100).toFixed(1)+"%",c:phaseColors.ms},{l:"PV",v:(pvExecuted/total*100).toFixed(1)+"%",c:phaseColors.pv}].map(s=>(
-            <div key={s.l} style={{textAlign:"center",minWidth:36}}>
-              <div style={{fontWeight:700,color:s.c,fontSize:13}}>{s.v}</div>
-              <div style={{color:"#555",fontSize:8}}>{s.l} ✓</div>
+          {[{l:"SP",app:spDone,exe:spExecuted,c:phaseColors.sp},{l:"MS",app:msDone,exe:msExecuted,c:phaseColors.ms},{l:"PV",app:pvDone,exe:pvExecuted,c:phaseColors.pv}].map(s=>(
+            <div key={s.l} style={{textAlign:"center"}}>
+              <div style={{fontSize:13,fontWeight:700,color:s.c}}>
+                {(s.exe/total*100).toFixed(1)}%
+                <span style={{fontSize:9,color:"#666",fontWeight:400,marginLeft:3}}>/ {(s.app/total*100).toFixed(1)}%</span>
+              </div>
+              <div style={{fontSize:8,color:"#666"}}>{s.l} <span style={{color:"#555"}}>exe</span> <span style={{color:"#444"}}>/</span> <span style={{color:"#444"}}>appr</span></div>
             </div>
           ))}
           <span style={{color:"#22c55e",fontWeight:700,fontSize:12,borderLeft:"1px solid #1e1e35",paddingLeft:10}}>{mwp} / {TOTAL_MWP.toFixed(2)} MWp</span>
@@ -589,7 +592,7 @@ export default function SolarPark() {
             </div>
             <div style={{marginBottom:8}}>
               <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:4}}>PROGRESS</div>
-              {[{l:"Screwpiles",p:spExecuted/total*100,c:phaseColors.sp,n:spExecuted},{l:"Mounting System",p:msExecuted/total*100,c:phaseColors.ms,n:msExecuted},{l:"PV Panels",p:pvExecuted/total*100,c:phaseColors.pv,n:pvExecuted}].map(s=>(
+              {[{l:"Screwpiles",p:spDone/total*100,c:phaseColors.sp,n:spDone},{l:"Mounting System",p:msDone/total*100,c:phaseColors.ms,n:msDone},{l:"PV Panels",p:pvDone/total*100,c:phaseColors.pv,n:pvDone}].map(s=>(
                 <div key={s.l} style={{marginBottom:4}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#666",marginBottom:1}}>
                     <span>{s.l}</span><span style={{color:s.c}}>{s.p.toFixed(1)}% ({s.n})</span>
@@ -1093,7 +1096,7 @@ export default function SolarPark() {
         const msPend = msPendingInsp, msApp = msDone; // msDone = phases>=4, msPend = phases===3
         const pvPend = pvPendingInsp, pvApp = pvDone;
         const notStarted = stats[0];
-        const totalMwpInstalled = (pvExecuted * mwpPerTable).toFixed(2);
+        const totalMwpInstalled = (pvDone * mwpPerTable).toFixed(2);
         const spTotalScrewpiles = T * SP_PER_TABLE;
         const spInstalledScrewpiles = spApp * SP_PER_TABLE;
         const spPendingScrewpiles = spPend * SP_PER_TABLE;
@@ -1122,17 +1125,16 @@ export default function SolarPark() {
           <div style={{flex:1,overflow:"auto",padding:20,background:"#0d0d14"}}>
             <div style={{maxWidth:920,margin:"0 auto"}}>
               <h2 style={{margin:"0 0 16px",fontSize:18,fontWeight:800,color:"#e0e0e8"}}>📊 Project Metrics</h2>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
                 {[
-                  {label:"Total tables",    val:T.toLocaleString(),         sub:"",                 color:"#555"},
-                  {label:"Total capacity",  val:`${TOTAL_MWP.toFixed(2)} MWp`,         sub:"65,017,800 Wp",    color:"#555"},
-                  {label:"PV installed",    val:`${totalMwpInstalled} MWp`, sub:`${pvExecuted} tables`,  color:phaseColors.pv},
-                  {label:"Remaining",       val:`${(TOTAL_MWP-+totalMwpInstalled).toFixed(2)} MWp`, sub:`${T-pvExecuted} tables`, color:phaseColors.sp},
+                  {label:"Total capacity",  val:`${TOTAL_MWP.toFixed(2)} MWp`, sub:`${T.toLocaleString()} tables`,  color:"#888"},
+                  {label:"PV installed",    val:`${totalMwpInstalled} MWp`,    sub:`${pvDone} tables`,               color:phaseColors.pv},
+                  {label:"Remaining",       val:`${(TOTAL_MWP-+totalMwpInstalled).toFixed(2)} MWp`, sub:`${T-pvDone} tables`, color:phaseColors.sp},
                 ].map(k=>(
-                  <div key={k.label} style={{background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px"}}>
+                  <div key={k.label} style={{background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px",textAlign:"center"}}>
                     <div style={{fontSize:9,color:"#555",letterSpacing:1,marginBottom:4}}>{k.label.toUpperCase()}</div>
-                    <div style={{fontSize:16,fontWeight:800,color:k.color==="555"?"#ccc":k.color}}>{k.val}</div>
-                    {k.sub && <div style={{fontSize:10,color:"#666",marginTop:2}}>{k.sub}</div>}
+                    <div style={{fontSize:18,fontWeight:800,color:k.color}}>{k.val}</div>
+                    <div style={{fontSize:10,color:"#666",marginTop:2}}>{k.sub}</div>
                   </div>
                 ))}
               </div>
@@ -1140,7 +1142,7 @@ export default function SolarPark() {
                 <Card title="🔩 Screwpiles" accent={phaseColors.sp}>
                   <Row label="Approved" val={spApp} sub={`${(spApp/T*100).toFixed(1)}%`} bar={spApp} barColor={phaseColors.sp} barMax={T}/>
                   <Row label="Pending inspection" val={spPend} sub={`${(spPend/T*100).toFixed(1)}%`} bar={spPend} barColor={phaseColors.sp} barMax={T}/>
-                  <Row label="Not started" val={T-spApp-spPend} sub={`${((T-spApp-spPend)/T*100).toFixed(1)}%`}/>
+                  <Row label="Remaining" val={T-spApp-spPend} sub={`${((T-spApp-spPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <div style={{background:"#0d0d1a",borderRadius:5,padding:"8px 10px"}}>
                     <div style={{fontSize:9,color:"#555",letterSpacing:1,marginBottom:5}}>SCREWPILE POSTS ({SP_PER_TABLE} per table)</div>
@@ -1153,7 +1155,7 @@ export default function SolarPark() {
                 <Card title="🏗 Mounting System" accent={phaseColors.ms}>
                   <Row label="Approved" val={msApp} sub={`${(msApp/T*100).toFixed(1)}%`} bar={msApp} barColor={phaseColors.ms} barMax={T}/>
                   <Row label="Pending inspection" val={msPend} sub={`${(msPend/T*100).toFixed(1)}%`} bar={msPend} barColor={phaseColors.ms} barMax={T}/>
-                  <Row label="Not started" val={T-msApp-msPend} sub={`${((T-msApp-msPend)/T*100).toFixed(1)}%`}/>
+                  <Row label="Remaining" val={T-msApp-msPend} sub={`${((T-msApp-msPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <Row label="Total approved MWp" val={`${(msApp*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                   <Row label="Total pending inspection" val={msPend} sub={`${(msPend/T*100).toFixed(1)}%`}/>
@@ -1161,7 +1163,7 @@ export default function SolarPark() {
                 <Card title="☀ PV Panels" accent={phaseColors.pv}>
                   <Row label="Approved" val={pvApp} sub={`${(pvApp/T*100).toFixed(1)}%`} bar={pvApp} barColor={phaseColors.pv} barMax={T}/>
                   <Row label="Pending inspection" val={pvPend} sub={`${(pvPend/T*100).toFixed(1)}%`} bar={pvPend} barColor={phaseColors.pv} barMax={T}/>
-                  <Row label="Not started" val={T-pvApp-pvPend} sub={`${((T-pvApp-pvPend)/T*100).toFixed(1)}%`}/>
+                  <Row label="Remaining" val={T-pvApp-pvPend} sub={`${((T-pvApp-pvPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <Row label="Total approved MWp" val={`${(pvApp*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                   <Row label="Total pending inspection" val={pvPend} sub={`${(pvPend/T*100).toFixed(1)}%`}/>
@@ -1169,8 +1171,8 @@ export default function SolarPark() {
               </div>
               {/* ── 80% and 100% Target Cards ── */}
               {(()=>{
-                const msExec = msExecuted;
-                const pvExec = pvExecuted;
+                const msExec = msDone;
+                const pvExec = pvDone;
                 const ms80Target = Math.ceil(T*0.8);
                 const pv80Target = MILESTONE_TABLES;
                 const msTo80  = Math.max(0, ms80Target - msExec);
@@ -1247,29 +1249,29 @@ export default function SolarPark() {
                 );
               })()}
               <div style={{marginTop:0}}>
-                <Card title="📡 BREAKDOWN BY MVPS BLOCK" accent="#818cf8">
+                <Card title="📡 BREAKDOWN BY MVPS BLOCK  ·  based on executed" accent="#818cf8">
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                       <thead>
                         <tr style={{color:"#555",fontSize:8,borderBottom:"1px solid #2d2d4a"}}>
                           <th rowSpan={2} style={{textAlign:"left",padding:"3px 8px",fontWeight:600,verticalAlign:"bottom"}}>MVPS</th>
-                          <th colSpan={2} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:"#444",borderBottom:"1px solid #1e1e35"}}>Capacity</th>
-                          <th colSpan={3} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:phaseColors.sp,borderBottom:"1px solid #1e1e35"}}>Screwpiles</th>
-                          <th colSpan={3} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:phaseColors.ms,borderBottom:"1px solid #1e1e35"}}>Mounting System</th>
-                          <th colSpan={3} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:phaseColors.pv,borderBottom:"1px solid #1e1e35"}}>PV Panels</th>
+                          <th colSpan={2} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:"#444",borderBottom:"1px solid #1e1e35",borderLeft:"1px solid #1e2030"}}>Capacity</th>
+                          <th colSpan={3} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:phaseColors.sp,borderBottom:"1px solid #1e1e35",borderLeft:"1px solid #1e2030"}}>Screwpiles</th>
+                          <th colSpan={3} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:phaseColors.ms,borderBottom:"1px solid #1e1e35",borderLeft:"1px solid #1e2030"}}>Mounting System</th>
+                          <th colSpan={3} style={{textAlign:"center",padding:"2px 8px",fontWeight:600,color:phaseColors.pv,borderBottom:"1px solid #1e1e35",borderLeft:"1px solid #1e2030"}}>PV Panels</th>
                         </tr>
                         <tr style={{color:"#555",fontSize:8}}>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>Tables</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>MWp</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500,color:phaseColors.sp}}>Done</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>%</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>Rem.</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500,color:phaseColors.ms}}>Done</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>%</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>Rem.</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500,color:phaseColors.pv}}>Done</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>%</th>
-                          <th style={{textAlign:"right",padding:"3px 8px",fontWeight:500}}>MWp</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500,borderLeft:"1px solid #1e2030"}}>Tables</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500}}>MWp</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500,color:phaseColors.sp,borderLeft:"1px solid #1e2030"}}>Executed</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500}}>%</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500,color:"#444"}}>Pending inspection</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500,color:phaseColors.ms,borderLeft:"1px solid #1e2030"}}>Executed</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500}}>%</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500,color:"#444"}}>Pending inspection</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500,color:phaseColors.pv,borderLeft:"1px solid #1e2030"}}>Executed</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500}}>%</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:500}}>MWp</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1277,43 +1279,56 @@ export default function SolarPark() {
                           const bt = TABLES.filter(t=>t.m===mv);
                           const n  = bt.length;
                           const totalMwp = (n*mwpPerTable).toFixed(2);
-                          const sp = bt.filter(t=>(phases[t.id]||0)>=2).length;
-                          const ms = bt.filter(t=>(phases[t.id]||0)>=4).length;
-                          const pv = bt.filter(t=>(phases[t.id]||0)===6).length;
-                          const pvMwp = (pv*mwpPerTable).toFixed(2);
-                          const TD = ({v, c, dim}) => (
-                            <td style={{padding:"4px 8px",textAlign:"right",color:dim?"#444":c||"#888",fontVariantNumeric:"tabular-nums"}}>{v}</td>
+                          // executed = started (pending+approved); approved = passed inspection
+                          const spExe = bt.filter(t=>(phases[t.id]||0)>=1).length;
+                          const spApp = bt.filter(t=>(phases[t.id]||0)>=2).length;
+                          const spPend = spExe - spApp;
+                          const msExe = bt.filter(t=>(phases[t.id]||0)>=3).length;
+                          const msApp = bt.filter(t=>(phases[t.id]||0)>=4).length;
+                          const msPend = msExe - msApp;
+                          const pvExe = bt.filter(t=>(phases[t.id]||0)>=5).length;
+                          const pvApp = bt.filter(t=>(phases[t.id]||0)===6).length;
+                          const pvPend = pvExe - pvApp;
+                          const pvMwp = (pvExe*mwpPerTable).toFixed(2);
+                          const SEP = "1px solid #1e2030";
+                          const TD = ({v, c, sep}) => (
+                            <td style={{padding:"4px 8px",textAlign:"center",color:c||"#888",fontVariantNumeric:"tabular-nums",borderLeft:sep?SEP:"none"}}>{v}</td>
+                          );
+                          const PendCell = ({pend, sep}) => (
+                            <td style={{padding:"4px 8px",textAlign:"center",color:"#444",fontVariantNumeric:"tabular-nums",fontSize:10}}>
+                              {pend>0?<span style={{color:"#555"}}>-{pend}</span>:"—"}
+                            </td>
                           );
                           return (
                             <tr key={mv} style={{borderTop:"1px solid #1a1a2e"}}>
                               <td style={{padding:"4px 8px",color:BC[mv],fontWeight:700,whiteSpace:"nowrap"}}>MVPS {mv}</td>
-                              <TD v={n} c="#888"/>
+                              <TD v={n} c="#888" sep/>
                               <TD v={totalMwp} c="#555"/>
-                              <TD v={sp} c={phaseColors.sp}/>
-                              <TD v={(sp/n*100).toFixed(0)+"%"} c="#555"/>
-                              <TD v={n-sp} c="#444"/>
-                              <TD v={ms} c={phaseColors.ms}/>
-                              <TD v={(ms/n*100).toFixed(0)+"%"} c="#555"/>
-                              <TD v={n-ms} c="#444"/>
-                              <TD v={pv} c={phaseColors.pv}/>
-                              <TD v={(pv/n*100).toFixed(0)+"%"} c="#555"/>
+                              <TD v={spExe} c={phaseColors.sp} sep/>
+                              <TD v={(spExe/n*100).toFixed(0)+"%"} c="#555"/>
+                              <PendCell pend={spPend}/>
+                              <TD v={msExe} c={phaseColors.ms} sep/>
+                              <TD v={(msExe/n*100).toFixed(0)+"%"} c="#555"/>
+                              <PendCell pend={msPend}/>
+                              <TD v={pvExe} c={phaseColors.pv} sep/>
+                              <TD v={(pvExe/n*100).toFixed(0)+"%"} c="#555"/>
                               <TD v={pvMwp} c="#aaa"/>
                             </tr>
                           );
                         })}
                         <tr style={{borderTop:"2px solid #2d2d4a",fontWeight:700}}>
                           <td style={{padding:"4px 8px",color:"#ccc"}}>TOTAL</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#ccc"}}>{T}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#888"}}>{TOTAL_MWP.toFixed(2)}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:phaseColors.sp}}>{spApp}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#555"}}>{(spApp/T*100).toFixed(0)}%</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#444"}}>{T-spApp}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:phaseColors.ms}}>{msApp}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#555"}}>{(msApp/T*100).toFixed(0)}%</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#444"}}>{T-msApp}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:phaseColors.pv}}>{pvApp}</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#555"}}>{(pvApp/T*100).toFixed(0)}%</td>
-                          <td style={{padding:"4px 8px",textAlign:"right",color:"#aaa"}}>{totalMwpInstalled}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#ccc",borderLeft:"1px solid #1e2030"}}>{T}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#888"}}>{TOTAL_MWP.toFixed(2)}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:phaseColors.sp,borderLeft:"1px solid #1e2030"}}>{spExecuted}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#555"}}>{(spExecuted/T*100).toFixed(0)}%</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#444",fontSize:10}}>{spExecuted-spDone>0?<span style={{color:"#555"}}>-{spExecuted-spDone}</span>:"—"}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:phaseColors.ms,borderLeft:"1px solid #1e2030"}}>{msExecuted}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#555"}}>{(msExecuted/T*100).toFixed(0)}%</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#444",fontSize:10}}>{msExecuted-msDone>0?<span style={{color:"#555"}}>-{msExecuted-msDone}</span>:"—"}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:phaseColors.pv,borderLeft:"1px solid #1e2030"}}>{pvExecuted}</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#555"}}>{(pvExecuted/T*100).toFixed(0)}%</td>
+                          <td style={{padding:"4px 8px",textAlign:"center",color:"#aaa"}}>{(pvExecuted*mwpPerTable).toFixed(2)}</td>
                         </tr>
                       </tbody>
                     </table>
