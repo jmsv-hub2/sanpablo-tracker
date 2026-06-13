@@ -1128,7 +1128,7 @@ export default function SolarPark() {
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
                 <Card title="🔩 Screwpiles" accent={phaseColors.sp}>
-                  <Row label="Approved (trackers)" val={spApp} sub={`${(spApp/T*100).toFixed(1)}%`} bar={spApp} barColor={phaseColors.sp} barMax={T}/>
+                  <Row label="Approved" val={spApp} sub={`${(spApp/T*100).toFixed(1)}%`} bar={spApp} barColor={phaseColors.sp} barMax={T}/>
                   <Row label="Pending inspection" val={spPend} sub={`${(spPend/T*100).toFixed(1)}%`} bar={spPend} barColor={phaseColors.sp} barMax={T} indent/>
                   <Row label="Not started" val={T-spApp-spPend} sub={`${((T-spApp-spPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
