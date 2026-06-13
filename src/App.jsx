@@ -52,7 +52,9 @@ async function loadFromSheets() {
     name: s.name,
     color: s.color || SUB_COLORS[i % SUB_COLORS.length],
     tables: s.tables || [],
-    contracted: s.contracted || 0,
+    contractedMS: s.contractedMS || 0,
+    contractedPV: s.contractedPV || 0,
+    contracted: s.contractedMS||s.contractedPV ? (s.contractedMS||0)+(s.contractedPV||0) : (s.contracted || 0),
   }));
   try {
     const [dataRes, cfgRes] = await Promise.all([
@@ -165,8 +167,9 @@ export default function SolarPark() {
   const [colorPickerId, setColorPickerId] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [phaseOpacity, setPhaseOpacity] = useState({sp:1, ms:1, pv:1});
-  const [newSubName, setNewSubName]   = useState("");
-  const [newSubContracted, setNewSubContracted] = useState("");
+  const [newSubName, setNewSubName]         = useState("");
+  const [newSubContractedMS, setNewSubContractedMS] = useState("");
+  const [newSubContractedPV, setNewSubContractedPV] = useState("");
   const [toast, setToast] = useState(null);
   const showToast = useCallback(() => {
     setToast("View only — no edit access");
@@ -278,7 +281,7 @@ export default function SolarPark() {
     configTimer.current = setTimeout(() => {
       pushConfig({
         phaseColors,
-        subs: subs.map(s => ({ id: s.id, name: s.name, color: s.color, contracted: s.contracted || 0 })),
+        subs: subs.map(s => ({ id: s.id, name: s.name, color: s.color, contractedMS: s.contractedMS||0, contractedPV: s.contractedPV||0, contracted: s.contracted||0 })),
       });
     }, 2000);
   }, [subs, phaseColors, loaded, canEdit]);
@@ -936,14 +939,24 @@ export default function SolarPark() {
                 <p style={{margin:"4px 0 0",fontSize:12,color:"#666"}}>Use <b style={{color:"#818cf8"}}>⚑ Assign Sub</b> on the map to paint tables onto each subcontractor.</p>
               </div>
               {canEdit ? (
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                   <input value={newSubName} onChange={e=>setNewSubName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
                     placeholder="Subcontractor name…"
                     style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:170}}/>
-                  <input value={newSubContracted} onChange={e=>setNewSubContracted(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                    placeholder="Contracted tables"
-                    type="number" min={0}
-                    style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#ccc",borderRadius:5,padding:"6px 10px",fontSize:13,outline:"none",width:130,textAlign:"center"}}/>
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                      <input value={newSubContractedMS} onChange={e=>setNewSubContractedMS(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                        placeholder="0" type="number" min={0}
+                        style={{background:"#1a1a2e",border:`1px solid ${phaseColors.ms}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
+                      <span style={{fontSize:8,color:phaseColors.ms,letterSpacing:.5}}>MS tables</span>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                      <input value={newSubContractedPV} onChange={e=>setNewSubContractedPV(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                        placeholder="0" type="number" min={0}
+                        style={{background:"#1a1a2e",border:`1px solid ${phaseColors.pv}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
+                      <span style={{fontSize:8,color:phaseColors.pv,letterSpacing:.5}}>PV tables</span>
+                    </div>
+                  </div>
                   <button onClick={addSub} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:newSubName.trim()?1:0.4}}>+ Add</button>
                 </div>
               ) : (
@@ -995,7 +1008,9 @@ export default function SolarPark() {
             )}
             {subs.map(sub=>{
               const assigned   = sub.tables.length;
-              const contracted = sub.contracted || 0;
+              const contractedMS = sub.contractedMS || 0;
+              const contractedPV = sub.contractedPV || 0;
+              const contracted = contractedMS + contractedPV || sub.contracted || 0;
               const contractedMwp = (contracted*30*615/1e6).toFixed(2);
               const msDone = sub.tables.filter(tid=>(phases[tid]||0)>=3).length;
               const done   = sub.tables.filter(tid=>(phases[tid]||0)===6).length;
@@ -1021,19 +1036,25 @@ export default function SolarPark() {
                   <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",minWidth:70,flexShrink:0}}>{sub.name}</span>
                   {/* Divider */}
                   <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
-                  {/* Contracted */}
-                  <div style={{textAlign:"center",minWidth:64,flexShrink:0}}>
-                    {canEdit ? (
-                      <input type="number" min={0} value={contracted||""} placeholder="—"
-                        onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,contracted:+e.target.value||0}:s))}
-                        onClick={e=>e.stopPropagation()}
-                        style={{width:52,background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#ccc",borderRadius:3,padding:"2px 5px",fontSize:12,outline:"none",textAlign:"center",display:"block",margin:"0 auto 2px"}}/>
-                    ) : (
-                      <div style={{fontSize:14,fontWeight:500,color:"#888",marginBottom:2}}>{contracted||"—"}</div>
-                    )}
-                    <div style={{fontSize:9,color:"#555"}}>Contracted</div>
-                    {contracted>0 && <div style={{fontSize:9,color:"#444"}}>{contractedMwp} MWp</div>}
-                  </div>
+                  {/* Contracted MS + PV */}
+                  {[{key:"contractedMS",label:"MS",color:phaseColors.ms},{key:"contractedPV",label:"PV",color:phaseColors.pv}].map(({key,label,color})=>{
+                    const val = sub[key]||0;
+                    const mwp = (val*30*615/1e6).toFixed(1);
+                    return (
+                      <div key={key} style={{textAlign:"center",minWidth:52,flexShrink:0}}>
+                        {canEdit ? (
+                          <input type="number" min={0} value={val||""} placeholder="—"
+                            onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,[key]:+e.target.value||0,contracted:(key==="contractedMS"?(+e.target.value||0)+(s.contractedPV||0):(s.contractedMS||0)+(+e.target.value||0))}:s))}
+                            onClick={e=>e.stopPropagation()}
+                            style={{width:48,background:"#1a1a2e",border:`1px solid ${color}44`,color:"#ccc",borderRadius:3,padding:"2px 4px",fontSize:12,outline:"none",textAlign:"center",display:"block",margin:"0 auto 2px"}}/>
+                        ) : (
+                          <div style={{fontSize:13,fontWeight:500,color:val?color:"#333",marginBottom:2}}>{val||"—"}</div>
+                        )}
+                        <div style={{fontSize:9,color:color,opacity:.7}}>Contr. {label}</div>
+                        {val>0 && <div style={{fontSize:8,color:"#444"}}>{mwp} MWp</div>}
+                      </div>
+                    );
+                  })}
                   {/* Divider */}
                   <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
                   {/* Assigned */}
@@ -1342,8 +1363,8 @@ export default function SolarPark() {
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                         <thead>
                           <tr style={{color:"#555",fontSize:9}}>
-                            {["Subcontractor","Contracted","Assigned","Asgn %","MWp","MS ✓","MS %","PV ✓","PV %","PV MWp"].map(h=>(
-                              <th key={h} style={{textAlign:h==="Subcontractor"?"left":"right",padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                            {["Subcontractor","Contr MS","Contr PV","Assigned","Asgn %","MWp","MS ✓","MS %","PV ✓","PV %","PV MWp"].map(h=>(
+                              <th key={h} style={{textAlign:h==="Subcontractor"?"left":"right",padding:"3px 8px",fontWeight:600,whiteSpace:"nowrap",color:h==="Contr MS"?phaseColors.ms:h==="Contr PV"?phaseColors.pv:"inherit"}}>{h}</th>
                             ))}
                           </tr>
                         </thead>
@@ -1365,7 +1386,8 @@ export default function SolarPark() {
                                     <span style={{color:"#ccc"}}>{sub.name}</span>
                                   </div>
                                 </td>
-                                <td style={{padding:"5px 8px",textAlign:"right",color:"#888"}}>{ctr||"—"}</td>
+                                <td style={{padding:"5px 8px",textAlign:"right",color:phaseColors.ms,fontSize:10}}>{sub.contractedMS||"—"}</td>
+                              <td style={{padding:"5px 8px",textAlign:"right",color:phaseColors.pv,fontSize:10}}>{sub.contractedPV||"—"}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:over?"#f87171":"#888"}}>{n}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:over?"#f87171":"#666"}}>{asgnPct}</td>
                                 <td style={{padding:"5px 8px",textAlign:"right",color:"#888"}}>{mwpS}</td>
