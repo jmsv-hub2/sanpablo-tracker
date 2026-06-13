@@ -513,7 +513,7 @@ export default function SolarPark() {
             {syncStatus==="loading"?"⏳ Loading…": syncStatus==="saving"?"💾 Saving…": syncStatus==="ok"?"✓ Synced": "⚠ Offline"}
           </div>
           <div style={{display:"flex",gap:1,background:"#0d0d14",borderRadius:5,padding:2,marginLeft:4}}>
-            {[["map","🗺 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"]].map(([t,l])=>(
+            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)}
                 style={{background:tab===t?"#818cf8":"#1a1a2e",border:`1px solid ${tab===t?"#818cf8":"#2d2d4a"}`,color:tab===t?"#000":"#888",borderRadius:5,padding:"5px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===t?700:500,letterSpacing:0.3,transition:"all .15s"}}>{l}</button>
             ))}
