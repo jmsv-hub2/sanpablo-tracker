@@ -1089,8 +1089,8 @@ export default function SolarPark() {
       {tab==="metrics" && (() => {
         const T = total;
         const mwpPerTable = 30*615/1e6;
-        const spPend = spPendingInsp, spApp = spDone - spPendingInsp;
-        const msPend = msPendingInsp, msApp = msDone - msPendingInsp;
+        const spPend = spPendingInsp, spApp = spDone; // spDone = phases>=2, spPend = phases===1
+        const msPend = msPendingInsp, msApp = msDone; // msDone = phases>=4, msPend = phases===3
         const pvPend = pvPendingInsp, pvApp = pvDone;
         const notStarted = stats[0];
         const totalMwpInstalled = (pvExecuted * mwpPerTable).toFixed(2);
