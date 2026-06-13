@@ -1077,7 +1077,7 @@ export default function SolarPark() {
                   <Row label="Not started" val={T-spApp-spPend} sub={`${((T-spApp-spPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <Row label="Total approved MWp" val={`${(spApp*mwpPerTable).toFixed(2)}`} sub="MWp"/>
-                  <Row label="Total pending MWp"  val={`${(spPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
+                  <Row label="Total pending inspection MWp"  val={`${(spPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                 </Card>
                 <Card title="🏗 Mounting System" accent={phaseColors.ms}>
                   <Row label="Approved" val={msApp} sub={`${(msApp/T*100).toFixed(1)}%`} bar={msApp} barColor={phaseColors.ms} barMax={T}/>
@@ -1085,7 +1085,7 @@ export default function SolarPark() {
                   <Row label="Not started" val={T-msApp-msPend} sub={`${((T-msApp-msPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <Row label="Total approved MWp" val={`${(msApp*mwpPerTable).toFixed(2)}`} sub="MWp"/>
-                  <Row label="Total pending MWp"  val={`${(msPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
+                  <Row label="Total pending inspection MWp"  val={`${(msPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                 </Card>
                 <Card title="☀ PV Panels" accent={phaseColors.pv}>
                   <Row label="Approved" val={pvApp} sub={`${(pvApp/T*100).toFixed(1)}%`} bar={pvApp} barColor={phaseColors.pv} barMax={T}/>
@@ -1093,7 +1093,7 @@ export default function SolarPark() {
                   <Row label="Not started" val={T-pvApp-pvPend} sub={`${((T-pvApp-pvPend)/T*100).toFixed(1)}%`}/>
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <Row label="Total approved MWp" val={`${(pvApp*mwpPerTable).toFixed(2)}`} sub="MWp"/>
-                  <Row label="Total pending MWp"  val={`${(pvPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
+                  <Row label="Total pending inspection MWp"  val={`${(pvPend*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                 </Card>
               </div>
               {/* ── 80% and 100% Target Cards ── */}
