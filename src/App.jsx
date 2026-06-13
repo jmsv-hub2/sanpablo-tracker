@@ -939,58 +939,87 @@ export default function SolarPark() {
                 <h2 style={{margin:0,fontSize:18,fontWeight:800,color:"#f5a623"}}>Subcontractors</h2>
                 <p style={{margin:"4px 0 0",fontSize:12,color:"#666"}}>Use <b style={{color:"#818cf8"}}>⚑ Assign Sub</b> on the map to paint tables onto each subcontractor.</p>
               </div>
-              {canEdit ? (
-                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                  <input value={newSubName} onChange={e=>setNewSubName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                    placeholder="Subcontractor name…"
-                    style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:170}}/>
-                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-                      <input value={newSubContractedMS} onChange={e=>setNewSubContractedMS(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                        placeholder="0" type="number" min={0}
-                        style={{background:"#1a1a2e",border:`1px solid ${phaseColors.ms}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
-                      <span style={{fontSize:8,color:phaseColors.ms,letterSpacing:.5}}>MS tables</span>
-                    </div>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-                      <input value={newSubContractedPV} onChange={e=>setNewSubContractedPV(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                        placeholder="0" type="number" min={0}
-                        style={{background:"#1a1a2e",border:`1px solid ${phaseColors.pv}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
-                      <span style={{fontSize:8,color:phaseColors.pv,letterSpacing:.5}}>PV tables</span>
-                    </div>
-                  </div>
-                  <button onClick={addSub} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:newSubName.trim()?1:0.4}}>+ Add</button>
-                </div>
-              ) : (
-                <div style={{fontSize:11,color:"#3a3a5a",padding:"6px 12px",background:"#0f0f1c",borderRadius:5,border:"1px solid #1e1e35"}}>👁 View only</div>
-              )}
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
+                {canEdit && <>
+                  <button onClick={()=>setSubs(prev=>[...prev].sort((a,b)=>a.name.localeCompare(b.name)))}
+                    style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#888",borderRadius:5,padding:"5px 10px",cursor:"pointer",fontSize:11}}>A→Z</button>
+                  <button onClick={()=>setSubs(prev=>[...prev].sort((a,b)=>((b.contractedMS||0)+(b.contractedPV||0))-((a.contractedMS||0)+(a.contractedPV||0))))}
+                    style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#888",borderRadius:5,padding:"5px 10px",cursor:"pointer",fontSize:11}}>By capacity</button>
+                  <button onClick={()=>{
+                    // Assign rainbow palette evenly spaced by hue, no repeats
+                    setSubs(prev=>{
+                      const n=prev.length;
+                      return prev.map((s,i)=>{
+                        const hue=Math.round((i/n)*360);
+                        // Convert HSL to hex
+                        const h=hue/360, s2=0.72, l=0.52;
+                        const q=l<0.5?l*(1+s2):l+s2-l*s2, p=2*l-q;
+                        const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+                        const r=Math.round(hue2rgb(p,q,h+1/3)*255);
+                        const g=Math.round(hue2rgb(p,q,h)*255);
+                        const b=Math.round(hue2rgb(p,q,h-1/3)*255);
+                        const hex='#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+                        return {...s,color:hex};
+                      });
+                    });
+                  }} style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#888",borderRadius:5,padding:"5px 10px",cursor:"pointer",fontSize:11}}>🎨 Recolor</button>
+                </>}
+              </div>
             </div>
+            {canEdit && (
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
+                <input value={newSubName} onChange={e=>setNewSubName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                  placeholder="Subcontractor name…"
+                  style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:170}}/>
+                <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                    <input value={newSubContractedMS} onChange={e=>setNewSubContractedMS(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                      placeholder="0" type="number" min={0}
+                      style={{background:"#1a1a2e",border:`1px solid ${phaseColors.ms}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
+                    <span style={{fontSize:8,color:phaseColors.ms,letterSpacing:.5}}>MS tables</span>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                    <input value={newSubContractedPV} onChange={e=>setNewSubContractedPV(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                      placeholder="0" type="number" min={0}
+                      style={{background:"#1a1a2e",border:`1px solid ${phaseColors.pv}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
+                    <span style={{fontSize:8,color:phaseColors.pv,letterSpacing:.5}}>PV tables</span>
+                  </div>
+                </div>
+                <button onClick={addSub} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:newSubName.trim()?1:0.4}}>+ Add</button>
+              </div>
+            )}
             {(()=>{
-              const totalContracted = subs.reduce((acc,s)=>(acc+(s.contracted||0)),0);
-              const totalAssigned   = subs.reduce((acc,s)=>(acc+s.tables.length),0);
-              const totalUnassigned = TABLES.length - totalAssigned;
-              const overContract    = totalContracted > TABLES.length;
-              const contractedMwp   = (totalContracted*30*615/1e6).toFixed(2);
-              const assignedMwp     = (totalAssigned*30*615/1e6).toFixed(2);
-              const totalMwp        = (TABLES.length*30*615/1e6).toFixed(2);
+              const totalContractedMS = subs.reduce((acc,s)=>acc+(s.contractedMS||0),0);
+              const totalContractedPV = subs.reduce((acc,s)=>acc+(s.contractedPV||0),0);
+              const totalAssigned     = subs.reduce((acc,s)=>acc+s.tables.length,0);
+              const totalUnassigned   = TABLES.length - totalAssigned;
+              const overMS = totalContractedMS > TABLES.length;
+              const overPV = totalContractedPV > TABLES.length;
+              const mwpMS  = (totalContractedMS*30*615/1e6).toFixed(2);
+              const mwpPV  = (totalContractedPV*30*615/1e6).toFixed(2);
+              const mwpAss = (totalAssigned*30*615/1e6).toFixed(2);
+              const mwpTot = (TABLES.length*30*615/1e6).toFixed(2);
               return (
                 <div style={{marginBottom:16,borderRadius:8,overflow:"hidden",border:"1px solid #1e1e35"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",background:"#12121f"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",background:"#12121f"}}>
                     {[
-                      {label:"Total capacity", val:TABLES.length, mwp:totalMwp, color:"#555"},
-                      {label:"Contracted",      val:totalContracted, mwp:contractedMwp, color:"#f5a623"},
-                      {label:"Assigned to map", val:totalAssigned,   mwp:assignedMwp,   color:"#818cf8"},
-                    ].map(k=>(
-                      <div key={k.label} style={{padding:"12px 16px",borderRight:"1px solid #1e1e35"}}>
+                      {label:"Total capacity",   val:TABLES.length,      mwp:mwpTot, color:"#555"},
+                      {label:"Contracted MS",     val:totalContractedMS,  mwp:mwpMS,  color:phaseColors.ms, over:overMS},
+                      {label:"Contracted PV",     val:totalContractedPV,  mwp:mwpPV,  color:phaseColors.pv, over:overPV},
+                      {label:"Assigned to map",   val:totalAssigned,      mwp:mwpAss, color:"#818cf8"},
+                    ].map((k,i)=>(
+                      <div key={k.label} style={{padding:"12px 16px",borderRight:i<3?"1px solid #1e1e35":"none"}}>
                         <div style={{fontSize:10,color:"#666",marginBottom:4}}>{k.label}</div>
-                        <div style={{fontSize:20,fontWeight:800,color:k.color}}>{k.val}</div>
+                        <div style={{fontSize:20,fontWeight:800,color:k.over?"#f87171":k.color}}>{k.val}</div>
                         <div style={{fontSize:11,color:"#555"}}>{k.mwp} MWp</div>
+                        {k.over && <div style={{fontSize:9,color:"#f87171",marginTop:2}}>⚠ over by {k.val-TABLES.length}</div>}
                       </div>
                     ))}
                   </div>
-                  {overContract && (
-                    <div style={{padding:"8px 16px",background:"#1a0a0a",borderTop:"1px solid #7f1d1d",display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:14}}>⚠</span>
-                      <span style={{fontSize:12,color:"#f87171",fontWeight:600}}>Over-contracted by {totalContracted-TABLES.length} tables ({((totalContracted-TABLES.length)*30*615/1e6).toFixed(2)} MWp) — contracted total exceeds park capacity</span>
+                  {(overMS || overPV) && (
+                    <div style={{padding:"6px 16px",background:"#1a0a0a",borderTop:"1px solid #7f1d1d",display:"flex",flexDirection:"column",gap:3}}>
+                      {overMS && <span style={{fontSize:11,color:"#f87171"}}>⚠ MS over-contracted by {totalContractedMS-TABLES.length} tables ({((totalContractedMS-TABLES.length)*30*615/1e6).toFixed(2)} MWp)</span>}
+                      {overPV && <span style={{fontSize:11,color:"#f87171"}}>⚠ PV over-contracted by {totalContractedPV-TABLES.length} tables ({((totalContractedPV-TABLES.length)*30*615/1e6).toFixed(2)} MWp)</span>}
                     </div>
                   )}
                   {totalUnassigned>0 && (
@@ -1067,20 +1096,20 @@ export default function SolarPark() {
                   {/* Divider */}
                   <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
                   {/* Bars */}
-                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:5}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:10,color:"#555",width:20,flexShrink:0}}>MS</span>
-                      <div style={{flex:1,height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:msP+"%",background:phaseColors.ms,borderRadius:2}}/>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:4,minWidth:80}}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:9,color:"#555",width:16,flexShrink:0}}>MS</span>
+                      <div style={{flex:1,height:2,background:"#1a1a2e",borderRadius:1,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:msP+"%",background:phaseColors.ms,borderRadius:1}}/>
                       </div>
-                      <span style={{fontSize:10,color:"#666",width:28,textAlign:"right",flexShrink:0}}>{msP}%</span>
+                      <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{msP}%</span>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:10,color:"#555",width:20,flexShrink:0}}>PV</span>
-                      <div style={{flex:1,height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:pvP+"%",background:"#22c55e",borderRadius:2}}/>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:9,color:"#555",width:16,flexShrink:0}}>PV</span>
+                      <div style={{flex:1,height:2,background:"#1a1a2e",borderRadius:1,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:pvP+"%",background:phaseColors.pv,borderRadius:1}}/>
                       </div>
-                      <span style={{fontSize:10,color:"#666",width:28,textAlign:"right",flexShrink:0}}>{pvP}%</span>
+                      <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{pvP}%</span>
                     </div>
                   </div>
                   {/* Remove */}
