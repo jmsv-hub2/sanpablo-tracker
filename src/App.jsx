@@ -528,9 +528,10 @@ export default function SolarPark() {
   const addSub = () => {
     const name=newSubName.trim(); if(!name) return;
     const cols=["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6"];
-    const contracted = parseInt(newSubContracted)||0;
-    setSubs(prev=>[...prev,{id:Date.now(),name,color:cols[prev.length%cols.length],tables:[],contracted}]);
-    setNewSubName(""); setNewSubContracted("");
+    const contractedMS = parseInt(newSubContractedMS)||0;
+    const contractedPV = parseInt(newSubContractedPV)||0;
+    setSubs(prev=>[...prev,{id:Date.now(),name,color:cols[prev.length%cols.length],tables:[],contractedMS,contractedPV,contracted:contractedMS+contractedPV}]);
+    setNewSubName(""); setNewSubContractedMS(""); setNewSubContractedPV("");
   };
   const removeSub = (id) => { setSubs(prev=>prev.filter(s=>s.id!==id)); setConfirmRemove(null); };
   if(!loaded || !phases) return (
