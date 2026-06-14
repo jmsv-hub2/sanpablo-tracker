@@ -780,7 +780,7 @@ export default function SolarPark() {
                     <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>PV</span>
                     <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>asgn</span>
                   </div>
-                  <div style={{fontSize:7,color:"#333",paddingLeft:27,marginBottom:3}}>contracted · · assigned</div>
+                  <div style={{fontSize:7,color:"#444",paddingLeft:27,marginBottom:3}}>contracted · · assigned</div>
                   {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
                   {subs.map(s => {
                     const mwp = (s.tables.length * 30 * 615 / 1e6).toFixed(2);
