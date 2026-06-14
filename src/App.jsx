@@ -773,14 +773,13 @@ export default function SolarPark() {
                   </div>
                 </div>
                 {!collapseSubcons && <>
-                  <div style={{display:"flex",padding:"1px 4px 3px",marginBottom:2,borderBottom:"1px solid #1a1a2e"}}>
-                    <div style={{width:23,flexShrink:0}}/>
+                  <div style={{display:"flex",gap:5,padding:"1px 4px 3px",marginBottom:2,borderBottom:"1px solid #1a1a2e",alignItems:"center"}}>
+                    <div style={{width:18,flexShrink:0}}/>
                     <span style={{flex:1}}/>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>MS</span>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>PV</span>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>Assigned</span>
+                    <span style={{fontSize:7,color:"#555",width:26,textAlign:"center",flexShrink:0}}>MS</span>
+                    <span style={{fontSize:7,color:"#555",width:26,textAlign:"center",flexShrink:0}}>PV</span>
+                    <span style={{fontSize:7,color:"#555",width:26,textAlign:"center",flexShrink:0}}>Assigned</span>
                   </div>
-                  <div style={{fontSize:7,color:"#444",paddingLeft:27,marginBottom:3}}>contracted · · assigned</div>
                   {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
                   {subs.map(s => {
                     const mwp = (s.tables.length * 30 * 615 / 1e6).toFixed(2);
