@@ -186,6 +186,38 @@ export default function SolarPark() {
   const [syncStatus, setSyncStatus] = useState("loading"); 
   const [syncMsg, setSyncMsg]       = useState("");
   const [syncDate, setSyncDate]     = useState("");
+  // ── Easter egg ──
+  const [easterEgg, setEasterEgg] = useState(null); // null | 'flashing' | 'message' | 'fadeout'
+  const [eggTick, setEggTick] = useState(0);
+  const konamiRef = useRef([]);
+  const easterTimers = useRef([]);
+  const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+  useEffect(() => {
+    const handler = (e) => {
+      konamiRef.current = [...konamiRef.current, e.key].slice(-10);
+      if(konamiRef.current.join(',') === KONAMI.join(',')) {
+        konamiRef.current = [];
+        // Clear any existing timers
+        easterTimers.current.forEach(clearTimeout);
+        easterTimers.current = [];
+        setEasterEgg('flashing');
+        // Escalate then message then fadeout
+        easterTimers.current.push(setTimeout(()=>setEasterEgg('message'), 3200));
+        easterTimers.current.push(setTimeout(()=>setEasterEgg('fadeout'), 5800));
+        easterTimers.current.push(setTimeout(()=>setEasterEgg(null), 7000));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+  // RAF to drive rainbow animation
+  useEffect(() => {
+    if(!easterEgg || easterEgg === 'fadeout') return;
+    let raf;
+    const tick = () => { setEggTick(t => t+1); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [easterEgg]);
   const pendingSync = useRef([]);   
   const syncTimer   = useRef(null);
   const isPainting  = useRef(false);
@@ -922,11 +954,14 @@ export default function SolarPark() {
                   const dim = phaseDim || subDim;
                   const grp = ph<=2?"sp":ph<=4?"ms":"pv";
                   const opac = ph===0 ? 1 : (phaseOpacity[grp]??1);
-                  const fillColor = dim ? PHASES[0].color : showPhases ? p.color : PHASES[0].color;
-                  const fillOpacity = dim ? 1 : (showPhases ? opac : 1);
+                  const fillColor = dim ? PHASES[0].color : showPhases ? p.color : (showSubs && subCol) ? subCol : PHASES[0].color;
+                  const fillOpacity = dim ? 1 : (showPhases ? opac : (showSubs && subCol) ? 0.55 : 1);
+                  // Easter egg: rainbow flash, speed escalates over 3.2s
+                  const eggColor = (easterEgg === 'flashing' || easterEgg === 'message')
+                    ? `hsl(${(eggTick*4 + t.x*0.2 + t.y*0.2) % 360},100%,55%)` : null;
                   const subOpacHex = subCol ? Math.round(((subs.find(s=>s.tables.includes(t.id))?.opacity??1)*255)).toString(16).padStart(2,'0') : 'ff';
                   const strokeColor = (showSubs && subCol && !dim) ? subCol+subOpacHex : PHASES[0].border;
-                  const strokeW = (showSubs && subCol && !dim) ? 0.6 : 0.15;
+                  const strokeW = (showSubs && subCol && !dim) ? 0.8 : 0.15;
                   const opacity = 1;
                   const hasDualSub = subconPV[t.id] && subconPV[t.id] !== getSubForTable(t.id);
                   const tx = t.x+ROX, ty = t.y+ROY;
@@ -939,8 +974,8 @@ export default function SolarPark() {
                       onMouseLeave={()=>setTooltip(null)}>
                       <rect data-id={t.id}
                         x={tx} y={ty} width={RW} height={RH} rx={0.5}
-                        fill={fillColor}
-                        fillOpacity={fillOpacity}
+                        fill={eggColor || fillColor}
+                        fillOpacity={eggColor ? 1 : fillOpacity}
                         stroke={strokeColor}
                         strokeWidth={strokeW}/>
                       {hasDualSub && !dim && (
@@ -1022,6 +1057,31 @@ export default function SolarPark() {
               <div style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",background:"#12121f",border:`1px solid ${activeSub.color}`,borderRadius:20,padding:"5px 16px",fontSize:11,color:activeSub.color,pointerEvents:"none",zIndex:50,display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:8,height:8,borderRadius:2,background:activeSub.color}}/>
                 Assigning to: <b>{activeSub.name}</b> · {activeSub.tables.length} tables
+              </div>
+            )}
+            {/* ── Easter egg overlay ── */}
+            {(easterEgg === 'message' || easterEgg === 'fadeout') && (
+              <div style={{
+                position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
+                pointerEvents:"none",zIndex:200,
+                opacity: easterEgg === 'fadeout' ? 0 : 1,
+                transition: easterEgg === 'fadeout' ? "opacity 1.2s ease-out" : "opacity 0.3s ease-in",
+              }}>
+                <div style={{
+                  fontSize: "clamp(28px,5vw,64px)",
+                  fontWeight:900,
+                  textAlign:"center",
+                  letterSpacing:2,
+                  background:"linear-gradient(135deg,#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f472b6)",
+                  WebkitBackgroundClip:"text",
+                  WebkitTextFillColor:"transparent",
+                  filter:"drop-shadow(0 0 20px rgba(255,255,255,0.8))",
+                  animation:"eggPop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards",
+                  transformOrigin:"center",
+                }}>
+                  Pamboy<br/>bungi-bungi
+                </div>
+                <style>{`@keyframes eggPop { from { transform:scale(0.1); opacity:0; } to { transform:scale(1); opacity:1; } }`}</style>
               </div>
             )}
           </div>
