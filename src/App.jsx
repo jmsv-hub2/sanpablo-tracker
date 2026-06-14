@@ -427,7 +427,17 @@ export default function SolarPark() {
     setCtx(null);
   }, [TABLES, schedulePush, getSubForTable]);
   const onSvgMouseDown = useCallback((e) => {
-    if(paintMode || subAssignMode) { isPainting.current=true; return; }
+    if(paintMode) { isPainting.current=true; return; }
+    if(subAssignMode) {
+      isPainting.current=true;
+      // Also allow pan when clicking empty canvas in assign mode
+      if(!e.target.closest("[data-id]")) {
+        isPainting.current=false;
+        dragStart.current = { mx: e.clientX, my: e.clientY, px: vRef.current.x, py: vRef.current.y };
+        if(canvasRef.current) canvasRef.current.style.cursor = "grabbing";
+      }
+      return;
+    }
     if(!e.target.closest("[data-id]")) {
       dragStart.current = { mx: e.clientX, my: e.clientY, px: vRef.current.x, py: vRef.current.y };
       if(canvasRef.current) canvasRef.current.style.cursor = "grabbing";
@@ -763,12 +773,12 @@ export default function SolarPark() {
                   </div>
                 </div>
                 {!collapseSubcons && <>
-                  <div style={{display:"flex",padding:"1px 4px",marginBottom:3}}>
+                  <div style={{display:"flex",padding:"1px 4px 2px",marginBottom:1,borderBottom:"1px solid #1a1a2e"}}>
                     <div style={{width:23,flexShrink:0}}/>
                     <span style={{flex:1}}/>
-                    <span style={{fontSize:8,color:phaseColors.ms,width:26,textAlign:"right",flexShrink:0}}>c.MS</span>
-                    <span style={{fontSize:8,color:phaseColors.pv,width:26,textAlign:"right",flexShrink:0}}>c.PV</span>
-                    <span style={{fontSize:8,color:"#666",width:26,textAlign:"right",flexShrink:0}}>asgn.</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"right",flexShrink:0}}>c.MS</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"right",flexShrink:0}}>c.PV</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"right",flexShrink:0}}>asgn</span>
                   </div>
                   {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
                   {subs.map(s => {
@@ -791,8 +801,8 @@ export default function SolarPark() {
                               background:"transparent",border:`2px solid ${s.color}`,
                               outline:isColorOpen?"2px solid #fff":"none",outlineOffset:1}}/>
                           <span style={{flex:1,fontSize:10,color:isTarget?"#fff":"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:isTarget?700:400}}>{s.name}</span>
-                          <span style={{fontSize:9,color:(s.contractedMS||0)>0?phaseColors.ms:"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedMS||"—"}</span>
-                          <span style={{fontSize:9,color:(s.contractedPV||0)>0?phaseColors.pv:"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedPV||"—"}</span>
+                          <span style={{fontSize:9,color:(s.contractedMS||0)>0?"#aaa":"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedMS||"—"}</span>
+                          <span style={{fontSize:9,color:(s.contractedPV||0)>0?"#aaa":"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedPV||"—"}</span>
                           <span style={{fontSize:10,color:"#888",width:26,textAlign:"right",flexShrink:0}}>{s.tables.length}</span>
                         </div>
                         {isColorOpen && (
@@ -829,16 +839,15 @@ export default function SolarPark() {
                       <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",marginTop:3,borderTop:"1px solid #1e1e35",paddingTop:4}}>
                         <div style={{width:18,height:8,borderRadius:2,background:"transparent",flexShrink:0,border:"1px solid #2d2d4a"}}/>
                         <span style={{flex:1,fontSize:9,color:"#888",fontWeight:600}}>Total</span>
-                        <span style={{fontSize:9,color:phaseColors.ms,width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedMS||0),0)||"—"}</span>
-                        <span style={{fontSize:9,color:phaseColors.pv,width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedPV||0),0)||"—"}</span>
+                        <span style={{fontSize:9,color:"#777",width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedMS||0),0)||"—"}</span>
+                        <span style={{fontSize:9,color:"#777",width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedPV||0),0)||"—"}</span>
                         <span style={{fontSize:9,color:"#888",width:26,textAlign:"right",flexShrink:0}}>{totalAsgn}</span>
                       </div>
-                      <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginTop:2}}>
-                        <div style={{width:18,height:8,borderRadius:2,background:"#2d2d4a",flexShrink:0,border:"1px solid #3a3a5a"}}/>
-                        <span style={{flex:1,fontSize:9,color:"#666"}}>Unassigned</span>
-                        <span style={{fontSize:9,color:"#555",width:32,textAlign:"right",flexShrink:0}}>—</span>
-                        <span style={{fontSize:9,color:"#555",width:28,textAlign:"right",flexShrink:0}}>{unassigned}</span>
-                        <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0}}>{uMwp}</span>
+                      <div style={{height:1,background:"#1a1a2e",margin:"4px 0 3px"}}/>
+                      <div style={{display:"flex",alignItems:"center",gap:5,padding:"1px 4px"}}>
+                        <span style={{flex:1,fontSize:8,color:"#444"}}>Unassigned</span>
+                        <span style={{fontSize:9,color:"#555",width:26,textAlign:"right",flexShrink:0}}>{unassigned}</span>
+                        <span style={{fontSize:8,color:"#444",width:26,textAlign:"right",flexShrink:0,whiteSpace:"nowrap"}}>{uMwp} MWp</span>
                       </div>
                     </>);
                   })()}
@@ -972,7 +981,7 @@ export default function SolarPark() {
               );
             })}
             {tooltip && !paintMode && !subAssignMode && (
-              <div style={{position:"fixed",left:tooltip.x+12,top:tooltip.y-8,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100,boxShadow:"0 4px 16px rgba(0,0,0,.7)"}}>
+              <div style={{position:"fixed",left:tooltip.x+12,top:tooltip.y+18,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100,boxShadow:"0 4px 16px rgba(0,0,0,.7)"}}>
                 <div style={{fontWeight:700,color:"#fff"}}>{tooltip.id}</div>
                 <div style={{color:"#aaa",marginTop:1}}>MVPS {tooltip.mv} · {tooltip.ph}</div>
                 <div style={{color:"#666",fontSize:10,marginTop:1}}>30 panels · 18.45 kWp</div>
@@ -980,13 +989,15 @@ export default function SolarPark() {
                   const msName = subs.find(s=>s.tables.includes(tooltip.id))?.name;
                   const pvName = subconPV[tooltip.id];
                   const hasDual = pvName && pvName !== msName;
+                  const msColor = subs.find(s=>s.name===msName)?.color||phaseColors.ms;
+                  const pvColor = subs.find(s=>s.name===pvName)?.color||phaseColors.pv;
                   return hasDual ? (
                     <div style={{marginTop:2}}>
-                      <div style={{color:phaseColors.ms,fontSize:9}}>⚑ MS: {msName}</div>
-                      <div style={{color:phaseColors.pv,fontSize:9}}>⚑ PV: {pvName}</div>
+                      <div style={{color:msColor,fontSize:9}}>⚑ MS: {msName}</div>
+                      <div style={{color:pvColor,fontSize:9}}>⚑ PV: {pvName}</div>
                     </div>
                   ) : msName ? (
-                    <div style={{color:"#f5a623",fontSize:9,marginTop:2}}>⚑ {msName}</div>
+                    <div style={{color:subs.find(s=>s.name===msName)?.color||"#f5a623",fontSize:9,marginTop:2}}>⚑ {msName}</div>
                   ) : null;
                 })()}
               </div>
@@ -1060,13 +1071,13 @@ export default function SolarPark() {
                     style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:170,height:32}}/>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                  <span style={{fontSize:9,color:phaseColors.ms}}>MS tables</span>
+                  <span style={{fontSize:9,color:phaseColors.ms,textAlign:"center",display:"block"}}>MS tables</span>
                   <input value={newSubContractedMS} onChange={e=>setNewSubContractedMS(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
                     placeholder="0" type="number" min={0}
                     style={{background:"#1a1a2e",border:`1px solid ${phaseColors.ms}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:80,textAlign:"center",height:32}}/>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                  <span style={{fontSize:9,color:phaseColors.pv}}>PV tables</span>
+                  <span style={{fontSize:9,color:phaseColors.pv,textAlign:"center",display:"block"}}>PV tables</span>
                   <input value={newSubContractedPV} onChange={e=>setNewSubContractedPV(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
                     placeholder="0" type="number" min={0}
                     style={{background:"#1a1a2e",border:`1px solid ${phaseColors.pv}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:80,textAlign:"center",height:32}}/>
@@ -1152,32 +1163,34 @@ export default function SolarPark() {
                   <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",minWidth:60,maxWidth:120,flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub.name}</span>
                   {/* Divider */}
                   <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
-                  {/* Contracted MS + PV */}
-                  {[{key:"contractedMS",label:"MS",color:phaseColors.ms},{key:"contractedPV",label:"PV",color:phaseColors.pv}].map(({key,label,color})=>{
-                    const val = sub[key]||0;
-                    const mwp = (val*30*615/1e6).toFixed(1);
-                    return (
-                      <div key={key} style={{textAlign:"center",minWidth:48,flexShrink:0}}>
-                        {canEdit ? (
-                          <input type="number" min={0} value={val||""} placeholder="—"
-                            onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,[key]:+e.target.value||0,contracted:key==="contractedMS"?Math.max(+e.target.value||0,s.contractedPV||0):Math.max(s.contractedMS||0,+e.target.value||0)}:s))}
-                            onClick={e=>e.stopPropagation()}
-                            style={{width:44,background:"#1a1a2e",border:`1px solid ${color}44`,color:"#ccc",borderRadius:3,padding:"2px 4px",fontSize:12,outline:"none",textAlign:"center",display:"block",margin:"0 auto 2px"}}/>
-                        ) : (
-                          <div style={{fontSize:13,fontWeight:500,color:val?color:"#333",marginBottom:2}}>{val||"—"}</div>
-                        )}
-                        <div style={{fontSize:9,color:color,opacity:.7}}>Contr. {label}</div>
-                        {val>0 && <div style={{fontSize:8,color:"#444"}}>{mwp} MWp</div>}
-                      </div>
-                    );
-                  })}
-                  {/* Divider */}
-                  <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
-                  {/* Assigned */}
-                  <div style={{textAlign:"center",minWidth:64,flexShrink:0}}>
-                    <div style={{fontSize:14,fontWeight:500,color:overAssigned?"#f87171":"#e0e0e8",marginBottom:2}}>{assigned}</div>
-                    <div style={{fontSize:9,color:"#555"}}>Assigned</div>
-                    <div style={{fontSize:9,color:"#444"}}>{mwpSub} MWp</div>
+                  {/* Contracted + Assigned grid */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,flex:1,minWidth:0}}>
+                    {[
+                      {key:"contractedMS",label:"Contracted MS",color:phaseColors.ms},
+                      {key:"contractedPV",label:"Contracted PV",color:phaseColors.pv},
+                    ].map(({key,label,color})=>{
+                      const val = sub[key]||0;
+                      const mwp = (val*30*615/1e6).toFixed(1);
+                      return (
+                        <div key={key} style={{background:"#0d0d1a",borderRadius:5,padding:"6px 8px",border:`1px solid ${val?color+"22":"#1a1a2e"}`}}>
+                          <div style={{fontSize:8,color:"#555",marginBottom:3}}>{label.toUpperCase()}</div>
+                          {canEdit ? (
+                            <input type="number" min={0} value={val||""} placeholder="—"
+                              onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,[key]:+e.target.value||0,contracted:key==="contractedMS"?Math.max(+e.target.value||0,s.contractedPV||0):Math.max(s.contractedMS||0,+e.target.value||0)}:s))}
+                              onClick={e=>e.stopPropagation()}
+                              style={{width:"100%",background:"transparent",border:"none",color:val?color:"#555",fontSize:15,fontWeight:600,outline:"none",padding:0}}/>
+                          ) : (
+                            <div style={{fontSize:15,fontWeight:600,color:val?color:"#444"}}>{val||"—"}</div>
+                          )}
+                          {val>0 && <div style={{fontSize:8,color:"#444",marginTop:1}}>{mwp} MWp</div>}
+                        </div>
+                      );
+                    })}
+                    <div style={{background:"#0d0d1a",borderRadius:5,padding:"6px 8px",border:`1px solid ${overAssigned?"#7f1d1d":"#1a1a2e"}`}}>
+                      <div style={{fontSize:8,color:"#555",marginBottom:3}}>ASSIGNED</div>
+                      <div style={{fontSize:15,fontWeight:600,color:overAssigned?"#f87171":"#e0e0e8"}}>{assigned}</div>
+                      <div style={{fontSize:8,color:"#444",marginTop:1}}>{mwpSub} MWp</div>
+                    </div>
                   </div>
                   {/* Remove */}
                   {canEdit && (confirmRemove===sub.id ? (
