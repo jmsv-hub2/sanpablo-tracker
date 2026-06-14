@@ -54,7 +54,7 @@ async function loadFromSheets() {
     tables: s.tables || [],
     contractedMS: s.contractedMS || 0,
     contractedPV: s.contractedPV || 0,
-    contracted: s.contractedMS||s.contractedPV ? (s.contractedMS||0)+(s.contractedPV||0) : (s.contracted || 0),
+    contracted: s.contractedMS||s.contractedPV ? Math.max(s.contractedMS||0,s.contractedPV||0) : (s.contracted || 0),
   }));
   try {
     const [dataRes, cfgRes] = await Promise.all([
@@ -168,7 +168,8 @@ export default function SolarPark() {
   const [collapseMvps, setCollapseMvps]   = useState(true);
   const [subFilter, setSubFilter]         = useState(null); 
   const [showPhases, setShowPhases]       = useState(true);
-  const [showMvps, setShowMvps]           = useState(false); 
+  const [showMvps, setShowMvps]           = useState(false);
+  const [showLabels, setShowLabels]         = useState(false); 
   const [colorPickerId, setColorPickerId] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [phaseOpacity, setPhaseOpacity] = useState({sp:1, ms:1, pv:1});
@@ -360,22 +361,24 @@ export default function SolarPark() {
   const toggleSubTable = useCallback((subId, tid) => {
     setSubs(prev => {
       const alreadyOwned = prev.find(s => s.id === subId)?.tables.includes(tid);
-      const next = prev.map(s => {
-        if(s.id === subId) return {...s, tables: alreadyOwned ? s.tables.filter(x=>x!==tid) : [...s.tables, tid]};
-        return {...s, tables: s.tables.filter(x => x !== tid)}; // exclusive
-      });
+      const existingMS = prev.find(s => s.id !== subId && s.tables.includes(tid));
       const nowAssigned = !alreadyOwned;
       const subName = prev.find(s=>s.id===subId)?.name||"";
-      const existingMS = prev.find(s => s.id !== subId && s.tables.includes(tid));
+      let next;
       if(nowAssigned && existingMS) {
-        // Assigning as PV only (MS already taken)
+        // Second subcon on this table → assign as PV only, keep MS subcon's tables intact
+        next = prev.map(s =>
+          s.id === subId ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]} : s
+        );
         schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
-      } else {
-        schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: nowAssigned ? subName : "", subcontractor_pv: nowAssigned ? subName : "" }]);
-      }
-      if(nowAssigned && existingMS) {
         setSubconPV(p => ({...p, [tid]: subName}));
       } else {
+        // Normal exclusive assignment or removal
+        next = prev.map(s => {
+          if(s.id === subId) return {...s, tables: alreadyOwned ? s.tables.filter(x=>x!==tid) : [...s.tables, tid]};
+          return {...s, tables: s.tables.filter(x => x !== tid)};
+        });
+        schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: nowAssigned ? subName : "", subcontractor_pv: nowAssigned ? subName : "" }]);
         setSubconPV(p => { const n={...p}; if(nowAssigned) n[tid]=subName; else delete n[tid]; return n; });
       }
       return next;
@@ -384,18 +387,20 @@ export default function SolarPark() {
   const click = useCallback((id, e) => {
     e.stopPropagation();
     if(subAssignMode && subAssignId) { toggleSubTable(subAssignId, id); return; }
+    if(!showPhases) return; // phases OFF — no changes allowed
     if(paintMode) { applyPhase(id); return; }
     const newPh = ((phases?.[id]||0)+1) % 7;
     setPhases(p => ({...p, [id]: newPh}));
     schedulePush([{ id, phase: newPh, subcontractor_ms: getSubForTable(id) }]);
-  }, [paintMode, applyPhase, subAssignMode, subAssignId, toggleSubTable, phases, schedulePush, getSubForTable]);
+  }, [paintMode, applyPhase, subAssignMode, subAssignId, toggleSubTable, phases, schedulePush, getSubForTable, showPhases]);
   const rclick = useCallback((id, e) => {
     e.preventDefault(); e.stopPropagation();
-    if(subAssignMode && subAssignId) {
+    if(subAssignMode && subAssignId) { // sub assign always allowed
       setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
       schedulePush([{ id, phase: phases?.[id]||0, subcontractor_ms: "" }]);
       return;
     }
+    if(!showPhases) return; // phases OFF
     if(paintMode) {
       const newPh = Math.max((phases?.[id]||0)-1, 0);
       setPhases(p => ({...p, [id]: newPh}));
@@ -403,7 +408,7 @@ export default function SolarPark() {
       return;
     }
     setCtx({ id, x:e.clientX, y:e.clientY });
-  }, [paintMode, subAssignMode, subAssignId, phases, schedulePush, getSubForTable]);
+  }, [paintMode, subAssignMode, subAssignId, phases, schedulePush, getSubForTable, showPhases]);
   const handleEnter = useCallback((id, e) => {
     const t = TABLES.find(t=>t.id===id);
     setTooltip({id, ph:PHASES[Math.min(phases?.[id]||0, PHASES.length-1)].label, mv:t?.m, x:e.clientX, y:e.clientY});
@@ -423,7 +428,7 @@ export default function SolarPark() {
   }, [TABLES, schedulePush, getSubForTable]);
   const onSvgMouseDown = useCallback((e) => {
     if(paintMode || subAssignMode) { isPainting.current=true; return; }
-    if(!e.target.getAttribute("data-id")) {
+    if(!e.target.closest("[data-id]")) {
       dragStart.current = { mx: e.clientX, my: e.clientY, px: vRef.current.x, py: vRef.current.y };
       if(canvasRef.current) canvasRef.current.style.cursor = "grabbing";
     }
@@ -559,7 +564,7 @@ export default function SolarPark() {
     const cols=["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#f472b6"];
     const contractedMS = parseInt(newSubContractedMS)||0;
     const contractedPV = parseInt(newSubContractedPV)||0;
-    setSubs(prev=>[...prev,{id:Date.now(),name,color:cols[prev.length%cols.length],tables:[],contractedMS,contractedPV,contracted:contractedMS+contractedPV}]);
+    setSubs(prev=>[...prev,{id:Date.now(),name,color:cols[prev.length%cols.length],tables:[],contractedMS,contractedPV,contracted:Math.max(contractedMS,contractedPV)}]);
     setNewSubName(""); setNewSubContractedMS(""); setNewSubContractedPV("");
   };
   const removeSub = (id) => { setSubs(prev=>prev.filter(s=>s.id!==id)); setConfirmRemove(null); };
@@ -636,13 +641,22 @@ export default function SolarPark() {
                 </div>
               ))}
             </div>
-            <div style={{marginBottom:6,padding:"7px 8px",background:paintMode?"#0a120a":"#0d0d1a",border:`1px solid ${paintMode?"#22c55e55":"#1e1e35"}`,borderRadius:5}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:paintMode?6:0}}>
-                <span style={{fontSize:9,color:paintMode?"#22c55e":"#666",fontWeight:700,letterSpacing:1}}>🎨 PAINT MODE</span>
-                <button onClick={()=>{if(!canEdit){showToast();return;} setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); } return next; });}}                  style={{background:paintMode?"#22c55e":"#1e1e35",border:"none",color:paintMode?"#000":"#888",borderRadius:3,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:700}}>
-                  {paintMode?"ON ✓":"OFF"}
-                </button>
-              </div>
+            <div style={{marginBottom:6,padding:"7px 8px",background:"#0d0d1a",border:"1px solid #1e1e35",borderRadius:5}}>
+              {[
+                {icon:"🎨", label:"PAINT MODE", active:paintMode, color:"#22c55e",
+                  onClick:()=>{if(!canEdit){showToast();return;} setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); } return next; });}},
+                {icon:"🏷️", label:"LABELS",     active:showLabels, color:"#f5a623",
+                  onClick:()=>setShowLabels(s=>!s)},
+              ].map(({icon,label,active,color,onClick})=>(
+                <div key={label} style={{display:"flex",alignItems:"center",marginBottom:4}}>
+                  <span style={{fontSize:11,width:18,flexShrink:0,textAlign:"center"}}>{icon}</span>
+                  <span style={{fontSize:9,color:active?color:"#666",fontWeight:700,letterSpacing:1,flex:1}}>{label}</span>
+                  <button onClick={onClick}
+                    style={{background:active?color:"#1e1e35",border:"none",color:active?"#000":"#888",borderRadius:3,padding:"2px 8px",cursor:"pointer",fontSize:9,fontWeight:700,minWidth:36}}>
+                    {active?"ON ✓":"OFF"}
+                  </button>
+                </div>
+              ))}
               {paintMode && <>
                 <div style={{fontSize:8,color:"#555",marginBottom:5}}>Hover to paint · Right-click = step back</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2}}>
@@ -752,9 +766,9 @@ export default function SolarPark() {
                   <div style={{display:"flex",padding:"1px 4px",marginBottom:3}}>
                     <div style={{width:23,flexShrink:0}}/>
                     <span style={{flex:1}}/>
-                    <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0}}>contr.</span>
-                    <span style={{fontSize:8,color:"#666",width:28,textAlign:"right",flexShrink:0}}>assgn.</span>
-                    <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0}}>MWp</span>
+                    <span style={{fontSize:8,color:phaseColors.ms,width:26,textAlign:"right",flexShrink:0}}>c.MS</span>
+                    <span style={{fontSize:8,color:phaseColors.pv,width:26,textAlign:"right",flexShrink:0}}>c.PV</span>
+                    <span style={{fontSize:8,color:"#666",width:26,textAlign:"right",flexShrink:0}}>asgn.</span>
                   </div>
                   {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
                   {subs.map(s => {
@@ -763,6 +777,8 @@ export default function SolarPark() {
                     const isFiltered = subFilter === s.id;
                     const isColorOpen = colorPickerId === `sidebar_${s.id}`;
                     const SUB_PRESETS = ["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#e53e3e","#2b6cb0","#276749","#dd6b20"];
+                    const cMS=s.contractedMS||0, cPV=s.contractedPV||0;
+                    const contracted = cMS||cPV ? Math.max(cMS,cPV) : (s.contracted||0);
                     return (
                       <div key={s.id}>
                         <div onClick={()=>{ if(subAssignMode) setSubAssignId(id=>id===s.id?null:s.id); else setSubFilter(f=>f===s.id?null:s.id); }}
@@ -775,9 +791,9 @@ export default function SolarPark() {
                               background:"transparent",border:`2px solid ${s.color}`,
                               outline:isColorOpen?"2px solid #fff":"none",outlineOffset:1}}/>
                           <span style={{flex:1,fontSize:10,color:isTarget?"#fff":"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:isTarget?700:400}}>{s.name}</span>
-                          <span style={{fontSize:9,color:(s.contracted&&s.contracted>0)?"#aaa":"#3a3a5a",width:32,textAlign:"right",flexShrink:0}} title="Contracted tables">{s.contracted||"—"}</span>
-                          <span style={{fontSize:10,color:"#888",width:28,textAlign:"right",flexShrink:0}}>{s.tables.length}</span>
-                          <span style={{fontSize:9,color:"#666",width:32,textAlign:"right",flexShrink:0}}>{mwp}</span>
+                          <span style={{fontSize:9,color:(s.contractedMS||0)>0?phaseColors.ms:"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedMS||"—"}</span>
+                          <span style={{fontSize:9,color:(s.contractedPV||0)>0?phaseColors.pv:"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedPV||"—"}</span>
+                          <span style={{fontSize:10,color:"#888",width:26,textAlign:"right",flexShrink:0}}>{s.tables.length}</span>
                         </div>
                         {isColorOpen && (
                           <div style={{padding:"6px 6px 7px",marginBottom:3,background:"#12121f",borderRadius:4,border:`1px solid ${s.color}44`}}>
@@ -805,16 +821,17 @@ export default function SolarPark() {
                     const assignedSet = new Set(subs.flatMap(s=>s.tables));
                     const unassigned = TABLES.filter(t=>!assignedSet.has(t.id)).length;
                     const uMwp = (unassigned*30*615/1e6).toFixed(2);
-                    const totalContr = subs.reduce((a,s)=>a+(s.contracted||0),0);
+                    // Total contracted = sum of (contractedMS + contractedPV) per sub
+                    const totalContr = subs.reduce((a,s)=>{ const cMS=s.contractedMS||0,cPV=s.contractedPV||0; return a+(cMS||cPV?Math.max(cMS,cPV):s.contracted||0); },0);
                     const totalAsgn  = subs.reduce((a,s)=>a+s.tables.length,0);
                     const totalMwp   = (totalAsgn*30*615/1e6).toFixed(2);
                     return (<>
                       <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",marginTop:3,borderTop:"1px solid #1e1e35",paddingTop:4}}>
                         <div style={{width:18,height:8,borderRadius:2,background:"transparent",flexShrink:0,border:"1px solid #2d2d4a"}}/>
                         <span style={{flex:1,fontSize:9,color:"#888",fontWeight:600}}>Total</span>
-                        <span style={{fontSize:9,color:"#888",width:32,textAlign:"right",flexShrink:0}}>{totalContr}</span>
-                        <span style={{fontSize:9,color:"#888",width:28,textAlign:"right",flexShrink:0}}>{totalAsgn}</span>
-                        <span style={{fontSize:8,color:"#777",width:32,textAlign:"right",flexShrink:0}}>{totalMwp}</span>
+                        <span style={{fontSize:9,color:phaseColors.ms,width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedMS||0),0)||"—"}</span>
+                        <span style={{fontSize:9,color:phaseColors.pv,width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedPV||0),0)||"—"}</span>
+                        <span style={{fontSize:9,color:"#888",width:26,textAlign:"right",flexShrink:0}}>{totalAsgn}</span>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginTop:2}}>
                         <div style={{width:18,height:8,borderRadius:2,background:"#2d2d4a",flexShrink:0,border:"1px solid #3a3a5a"}}/>
@@ -825,7 +842,7 @@ export default function SolarPark() {
                       </div>
                     </>);
                   })()}
-                  <div style={{fontSize:7.5,color:"#3a3a5a",marginTop:3,paddingLeft:4}}>contr. = contracted · assgn. = assigned</div>
+
                 </>}
               </div>
             </>}
@@ -902,18 +919,37 @@ export default function SolarPark() {
                   const strokeColor = (showSubs && subCol && !dim) ? subCol+subOpacHex : PHASES[0].border;
                   const strokeW = (showSubs && subCol && !dim) ? 0.6 : 0.15;
                   const opacity = 1;
+                  const hasDualSub = subconPV[t.id] && subconPV[t.id] !== getSubForTable(t.id);
+                  const tx = t.x+ROX, ty = t.y+ROY;
                   return (
-                    <rect key={t.id} data-id={t.id}
-                      x={t.x+ROX} y={t.y+ROY} width={RW} height={RH} rx={0.5}
-                      fill={fillColor}
-                      fillOpacity={fillOpacity}
-                      stroke={strokeColor}
-                      strokeWidth={strokeW}
+                    <g key={t.id}
                       style={{cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"pointer"):"default"}}
                       onClick={e=>{ if(canEdit) click(t.id,e); else showToast(); }}
                       onContextMenu={e=>{ if(canEdit) rclick(t.id,e); else { e.preventDefault(); showToast(); } }}
                       onMouseEnter={e=>handleEnter(t.id,e)}
-                      onMouseLeave={()=>setTooltip(null)}/>
+                      onMouseLeave={()=>setTooltip(null)}>
+                      <rect data-id={t.id}
+                        x={tx} y={ty} width={RW} height={RH} rx={0.5}
+                        fill={fillColor}
+                        fillOpacity={fillOpacity}
+                        stroke={strokeColor}
+                        strokeWidth={strokeW}/>
+                      {hasDualSub && !dim && (
+                        <line x1={tx} y1={ty+RH} x2={tx+RW} y2={ty}
+                          stroke="rgba(255,255,255,0.75)" strokeWidth={0.5}
+                          pointerEvents="none"/>
+                      )}
+                      {showLabels && (
+                        <text
+                          x={tx+RW/2} y={ty+RH/2}
+                          textAnchor="middle" dominantBaseline="central"
+                          fontSize={1.8} fill="rgba(255,255,255,0.85)"
+                          fontWeight="500"
+                          pointerEvents="none" style={{userSelect:"none",fontFamily:"monospace"}}>
+                          {t.id}
+                        </text>
+                      )}
+                    </g>
                   );
                 })}
               </g>
@@ -940,14 +976,34 @@ export default function SolarPark() {
                 <div style={{fontWeight:700,color:"#fff"}}>{tooltip.id}</div>
                 <div style={{color:"#aaa",marginTop:1}}>MVPS {tooltip.mv} · {tooltip.ph}</div>
                 <div style={{color:"#666",fontSize:10,marginTop:1}}>30 panels · 18.45 kWp</div>
-                {subColorMap[tooltip.id] && <div style={{color:"#f5a623",fontSize:9,marginTop:2}}>⚑ {subs.find(s=>s.tables.includes(tooltip.id))?.name}</div>}
+                {subColorMap[tooltip.id] && (() => {
+                  const msName = subs.find(s=>s.tables.includes(tooltip.id))?.name;
+                  const pvName = subconPV[tooltip.id];
+                  const hasDual = pvName && pvName !== msName;
+                  return hasDual ? (
+                    <div style={{marginTop:2}}>
+                      <div style={{color:phaseColors.ms,fontSize:9}}>⚑ MS: {msName}</div>
+                      <div style={{color:phaseColors.pv,fontSize:9}}>⚑ PV: {pvName}</div>
+                    </div>
+                  ) : msName ? (
+                    <div style={{color:"#f5a623",fontSize:9,marginTop:2}}>⚑ {msName}</div>
+                  ) : null;
+                })()}
               </div>
             )}
             {subAssignMode && tooltip && (
-              <div style={{position:"fixed",left:tooltip.x+12,top:tooltip.y-8,background:"#12121f",border:`1px solid ${activeSub?.color||"#818cf8"}55`,borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100}}>
+              <div style={{position:"fixed",left:tooltip.x+12,top:tooltip.y+18,background:"#12121f",border:`1px solid ${activeSub?.color||"#818cf8"}55`,borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100}}>
                 <div style={{fontWeight:700,color:"#fff"}}>{tooltip.id}</div>
                 {activeSub
-                  ? <div style={{color:activeSub.color,marginTop:1,fontSize:10}}>{subs.find(s=>s.tables.includes(tooltip.id))?.id===subAssignId?"Click to remove":"Click to assign"} → {activeSub.name}</div>
+                  ? (() => {
+                    const msName = subs.find(s=>s.tables.includes(tooltip.id))?.name;
+                    const pvName = subconPV[tooltip.id];
+                    const hasDual = pvName && pvName !== msName;
+                    return <div style={{marginTop:1,fontSize:10}}>
+                      {hasDual && <div style={{fontSize:9,marginBottom:1}}><span style={{color:phaseColors.ms}}>MS:{msName}</span> · <span style={{color:phaseColors.pv}}>PV:{pvName}</span></div>}
+                      <div style={{color:activeSub.color}}>{subs.find(s=>s.tables.includes(tooltip.id))?.id===subAssignId?"Click to remove":"Click to assign"} → {activeSub.name}</div>
+                    </div>;
+                  })()
                   : <div style={{color:"#666",fontSize:10}}>Select a subcontractor →</div>}
               </div>
             )}
@@ -1070,7 +1126,7 @@ export default function SolarPark() {
               const assigned   = sub.tables.length;
               const contractedMS = sub.contractedMS || 0;
               const contractedPV = sub.contractedPV || 0;
-              const contracted = contractedMS + contractedPV || sub.contracted || 0;
+              const contracted = contractedMS||contractedPV ? Math.max(contractedMS,contractedPV) : (sub.contracted||0);
               const contractedMwp = (contracted*30*615/1e6).toFixed(2);
               const msDone = sub.tables.filter(tid=>(phases[tid]||0)>=3).length;
               const done   = sub.tables.filter(tid=>(phases[tid]||0)===6).length;
@@ -1093,7 +1149,7 @@ export default function SolarPark() {
                     style={{width:10,height:10,borderRadius:2,background:sub.color,flexShrink:0,cursor:"pointer",
                       outline:colorPickerId===sub.id?"2px solid #fff":"none",outlineOffset:1}}/>
                   {/* Name */}
-                  <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",minWidth:70,flexShrink:0}}>{sub.name}</span>
+                  <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",minWidth:60,maxWidth:120,flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub.name}</span>
                   {/* Divider */}
                   <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
                   {/* Contracted MS + PV */}
@@ -1101,12 +1157,12 @@ export default function SolarPark() {
                     const val = sub[key]||0;
                     const mwp = (val*30*615/1e6).toFixed(1);
                     return (
-                      <div key={key} style={{textAlign:"center",minWidth:52,flexShrink:0}}>
+                      <div key={key} style={{textAlign:"center",minWidth:48,flexShrink:0}}>
                         {canEdit ? (
                           <input type="number" min={0} value={val||""} placeholder="—"
-                            onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,[key]:+e.target.value||0,contracted:(key==="contractedMS"?(+e.target.value||0)+(s.contractedPV||0):(s.contractedMS||0)+(+e.target.value||0))}:s))}
+                            onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,[key]:+e.target.value||0,contracted:key==="contractedMS"?Math.max(+e.target.value||0,s.contractedPV||0):Math.max(s.contractedMS||0,+e.target.value||0)}:s))}
                             onClick={e=>e.stopPropagation()}
-                            style={{width:48,background:"#1a1a2e",border:`1px solid ${color}44`,color:"#ccc",borderRadius:3,padding:"2px 4px",fontSize:12,outline:"none",textAlign:"center",display:"block",margin:"0 auto 2px"}}/>
+                            style={{width:44,background:"#1a1a2e",border:`1px solid ${color}44`,color:"#ccc",borderRadius:3,padding:"2px 4px",fontSize:12,outline:"none",textAlign:"center",display:"block",margin:"0 auto 2px"}}/>
                         ) : (
                           <div style={{fontSize:13,fontWeight:500,color:val?color:"#333",marginBottom:2}}>{val||"—"}</div>
                         )}
@@ -1122,25 +1178,6 @@ export default function SolarPark() {
                     <div style={{fontSize:14,fontWeight:500,color:overAssigned?"#f87171":"#e0e0e8",marginBottom:2}}>{assigned}</div>
                     <div style={{fontSize:9,color:"#555"}}>Assigned</div>
                     <div style={{fontSize:9,color:"#444"}}>{mwpSub} MWp</div>
-                  </div>
-                  {/* Divider */}
-                  <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
-                  {/* Bars */}
-                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:4,minWidth:80}}>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:9,color:"#555",width:16,flexShrink:0}}>MS</span>
-                      <div style={{flex:1,height:2,background:"#1a1a2e",borderRadius:1,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:msP+"%",background:phaseColors.ms,borderRadius:1}}/>
-                      </div>
-                      <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{msP}%</span>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:9,color:"#555",width:16,flexShrink:0}}>PV</span>
-                      <div style={{flex:1,height:2,background:"#1a1a2e",borderRadius:1,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:pvP+"%",background:phaseColors.pv,borderRadius:1}}/>
-                      </div>
-                      <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{pvP}%</span>
-                    </div>
                   </div>
                   {/* Remove */}
                   {canEdit && (confirmRemove===sub.id ? (
