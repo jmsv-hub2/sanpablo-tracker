@@ -65,11 +65,15 @@ async function loadFromSheets() {
     if (!dataJson.ok) throw new Error(dataJson.error);
     const phases = {};
     const subsMap = {};
+    const pvMap = {};
     dataJson.data.forEach(row => {
       phases[row.id] = parseInt(row.phase) || 0;
-      if (row.subcontractor) {
+      if (row.subcontractor_ms) {
         if (!subsMap[row.subcontractor]) subsMap[row.subcontractor] = [];
         subsMap[row.subcontractor].push(row.id);
+      }
+      if (row.subcontractor_pv) {
+        pvMap[row.id] = row.subcontractor_pv;
       }
     });
     // Config: colors + full subs list (with contracted, color)
@@ -89,14 +93,14 @@ async function loadFromSheets() {
     } catch(e) {}
     // Build final subs: prefer config (preserves order/color/contracted) else sheets map
     const finalSubs = subsFromConfig || buildSubs(Object.entries(subsMap).map(([name, tables]) => ({id:name,name,tables})));
-    return { phases, subs: finalSubs, colors, source: "sheets" };
+    return { phases, subs: finalSubs, colors, subconPV: pvMap, source: "sheets" };
   } catch(e) {
-    return { phases: {...INITIAL_PHASES}, subs: INITIAL_SUBS.map((s,i)=>({...s,color:SUB_COLORS[i%SUB_COLORS.length]})), colors: null, source: "embedded" };
+    return { phases: {...INITIAL_PHASES}, subs: INITIAL_SUBS.map((s,i)=>({...s,color:SUB_COLORS[i%SUB_COLORS.length]})), colors: null, subconPV: {}, source: "embedded" };
   }
 }
 async function pushToSheets(updates) {
   const now = new Date().toISOString().slice(0,10);
-  const payload = updates.map(u => ({ ...u, last_updated: now }));
+  const payload = updates.map(u => ({ ...u, last_updated: now, subcontractor_pv: u.subcontractor_pv ?? undefined }));
   const res = await fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" }, 
@@ -157,6 +161,7 @@ export default function SolarPark() {
   const [paintPhase, setPaintPhase]   = useState(6);
   const [subAssignMode, setSubAssignMode] = useState(false);
   const [subAssignId, setSubAssignId]     = useState(null);
+  const [subconPV, setSubconPV]           = useState({}); // tableId → subName for PV scope
   const [showSubs, setShowSubs]           = useState(false);
   const [collapsePhases, setCollapsePhases] = useState(false);
   const [collapseSubcons, setCollapseSubcons] = useState(true);
@@ -247,6 +252,7 @@ export default function SolarPark() {
           ...s,
           color: s.color || colorMap[s.id] || s.color,
         })));
+        if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
         setLoaded(true);
         if(sheetsData.source === "sheets") {
           setSyncStatus("ok");
@@ -328,18 +334,29 @@ export default function SolarPark() {
     const s = subs.find(s => s.tables.includes(tid));
     return s ? s.name : "";
   }, [subs]);
+  const getSubPVForTable = useCallback((tid) => subconPV[tid] || getSubForTable(tid), [subconPV, getSubForTable]);
   const applyPhase = useCallback((id) => {
     setPhases(p => ({...p, [id]: paintPhase}));
-    schedulePush([{ id, phase: paintPhase, subcontractor: getSubForTable(id) }]);
+    schedulePush([{ id, phase: paintPhase, subcontractor_ms: getSubForTable(id) }]);
   }, [paintPhase, schedulePush, getSubForTable]);
   const addToSub = useCallback((subId, tid) => {
-    setSubs(prev => prev.map(s =>
-      s.id === subId
-        ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]}
-        : {...s, tables: s.tables.filter(x => x !== tid)} // remove from all others
-    ));
-    schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor: subId }]);
-  }, [phases, schedulePush]);
+    const subName = subs.find(s=>s.id===subId)?.name||"";
+    const existingMS = subs.find(s => s.tables.includes(tid));
+    if(existingMS && existingMS.id !== subId) {
+      // Table already has an MS subcon → assign as PV only
+      setSubconPV(prev => ({...prev, [tid]: subName}));
+      schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
+    } else {
+      // No existing MS → assign as both MS and PV
+      setSubs(prev => prev.map(s =>
+        s.id === subId
+          ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]}
+          : {...s, tables: s.tables.filter(x => x !== tid)}
+      ));
+      setSubconPV(prev => ({...prev, [tid]: subName}));
+      schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: subName, subcontractor_pv: subName }]);
+    }
+  }, [phases, schedulePush, subs]);
   const toggleSubTable = useCallback((subId, tid) => {
     setSubs(prev => {
       const alreadyOwned = prev.find(s => s.id === subId)?.tables.includes(tid);
@@ -348,7 +365,19 @@ export default function SolarPark() {
         return {...s, tables: s.tables.filter(x => x !== tid)}; // exclusive
       });
       const nowAssigned = !alreadyOwned;
-      schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor: nowAssigned ? subId : "" }]);
+      const subName = prev.find(s=>s.id===subId)?.name||"";
+      const existingMS = prev.find(s => s.id !== subId && s.tables.includes(tid));
+      if(nowAssigned && existingMS) {
+        // Assigning as PV only (MS already taken)
+        schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
+      } else {
+        schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: nowAssigned ? subName : "", subcontractor_pv: nowAssigned ? subName : "" }]);
+      }
+      if(nowAssigned && existingMS) {
+        setSubconPV(p => ({...p, [tid]: subName}));
+      } else {
+        setSubconPV(p => { const n={...p}; if(nowAssigned) n[tid]=subName; else delete n[tid]; return n; });
+      }
       return next;
     });
   }, [phases, schedulePush]);
@@ -358,19 +387,19 @@ export default function SolarPark() {
     if(paintMode) { applyPhase(id); return; }
     const newPh = ((phases?.[id]||0)+1) % 7;
     setPhases(p => ({...p, [id]: newPh}));
-    schedulePush([{ id, phase: newPh, subcontractor: getSubForTable(id) }]);
+    schedulePush([{ id, phase: newPh, subcontractor_ms: getSubForTable(id) }]);
   }, [paintMode, applyPhase, subAssignMode, subAssignId, toggleSubTable, phases, schedulePush, getSubForTable]);
   const rclick = useCallback((id, e) => {
     e.preventDefault(); e.stopPropagation();
     if(subAssignMode && subAssignId) {
       setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
-      schedulePush([{ id, phase: phases?.[id]||0, subcontractor: "" }]);
+      schedulePush([{ id, phase: phases?.[id]||0, subcontractor_ms: "" }]);
       return;
     }
     if(paintMode) {
       const newPh = Math.max((phases?.[id]||0)-1, 0);
       setPhases(p => ({...p, [id]: newPh}));
-      schedulePush([{ id, phase: newPh, subcontractor: getSubForTable(id) }]);
+      schedulePush([{ id, phase: newPh, subcontractor_ms: getSubForTable(id) }]);
       return;
     }
     setCtx({ id, x:e.clientX, y:e.clientY });
@@ -383,7 +412,7 @@ export default function SolarPark() {
   }, [paintMode, applyPhase, phases, subAssignMode, subAssignId, addToSub, TABLES]);
   const setPhase = useCallback((id, ph) => {
     setPhases(p => ({...p, [id]:ph}));
-    schedulePush([{ id, phase: ph, subcontractor: getSubForTable(id) }]);
+    schedulePush([{ id, phase: ph, subcontractor_ms: getSubForTable(id) }]);
     setCtx(null);
   }, [schedulePush, getSubForTable]);
   const setBlockPhase = useCallback((mv, ph) => {
@@ -596,7 +625,7 @@ export default function SolarPark() {
             </div>
             <div style={{marginBottom:8}}>
               <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:4}}>PROGRESS</div>
-              {[{l:"Screwpiles",p:spDone/total*100,c:phaseColors.sp,n:spDone},{l:"Mounting System",p:msDone/total*100,c:phaseColors.ms,n:msDone},{l:"PV Panels",p:pvDone/total*100,c:phaseColors.pv,n:pvDone}].map(s=>(
+              {[{l:"Screwpiles",p:spExecuted/total*100,c:phaseColors.sp,n:spExecuted},{l:"Mounting System",p:msExecuted/total*100,c:phaseColors.ms,n:msExecuted},{l:"PV Panels",p:pvExecuted/total*100,c:phaseColors.pv,n:pvExecuted}].map(s=>(
                 <div key={s.l} style={{marginBottom:4}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#666",marginBottom:1}}>
                     <span>{s.l}</span><span style={{color:s.c}}>{s.p.toFixed(1)}% ({s.n})</span>
@@ -967,25 +996,26 @@ export default function SolarPark() {
               </div>
             </div>
             {canEdit && (
-              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
-                <input value={newSubName} onChange={e=>setNewSubName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                  placeholder="Subcontractor name…"
-                  style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:170}}/>
-                <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-                    <input value={newSubContractedMS} onChange={e=>setNewSubContractedMS(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                      placeholder="0" type="number" min={0}
-                      style={{background:"#1a1a2e",border:`1px solid ${phaseColors.ms}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
-                    <span style={{fontSize:8,color:phaseColors.ms,letterSpacing:.5}}>MS tables</span>
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-                    <input value={newSubContractedPV} onChange={e=>setNewSubContractedPV(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
-                      placeholder="0" type="number" min={0}
-                      style={{background:"#1a1a2e",border:`1px solid ${phaseColors.pv}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:70,textAlign:"center"}}/>
-                    <span style={{fontSize:8,color:phaseColors.pv,letterSpacing:.5}}>PV tables</span>
-                  </div>
+              <div style={{display:"flex",gap:6,alignItems:"flex-end",marginBottom:14,flexWrap:"wrap"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                  <span style={{fontSize:9,color:"#555"}}>Name</span>
+                  <input value={newSubName} onChange={e=>setNewSubName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                    placeholder="Subcontractor name…"
+                    style={{background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#fff",borderRadius:5,padding:"6px 12px",fontSize:13,outline:"none",width:170,height:32}}/>
                 </div>
-                <button onClick={addSub} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:newSubName.trim()?1:0.4}}>+ Add</button>
+                <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                  <span style={{fontSize:9,color:phaseColors.ms}}>MS tables</span>
+                  <input value={newSubContractedMS} onChange={e=>setNewSubContractedMS(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                    placeholder="0" type="number" min={0}
+                    style={{background:"#1a1a2e",border:`1px solid ${phaseColors.ms}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:80,textAlign:"center",height:32}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                  <span style={{fontSize:9,color:phaseColors.pv}}>PV tables</span>
+                  <input value={newSubContractedPV} onChange={e=>setNewSubContractedPV(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSub()}
+                    placeholder="0" type="number" min={0}
+                    style={{background:"#1a1a2e",border:`1px solid ${phaseColors.pv}55`,color:"#ccc",borderRadius:5,padding:"6px 8px",fontSize:13,outline:"none",width:80,textAlign:"center",height:32}}/>
+                </div>
+                <button onClick={addSub} style={{background:"#f5a623",border:"none",color:"#000",borderRadius:5,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700,opacity:newSubName.trim()?1:0.4,height:32}}>+ Add</button>
               </div>
             )}
             {(()=>{
@@ -1179,8 +1209,8 @@ export default function SolarPark() {
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
                 {[
                   {label:"Total capacity",  val:`${TOTAL_MWP.toFixed(2)} MWp`, sub:`${T.toLocaleString()} tables`,  color:"#888"},
-                  {label:"PV installed",    val:`${totalMwpInstalled} MWp`,    sub:`${pvDone} tables`,               color:phaseColors.pv},
-                  {label:"Remaining",       val:`${(TOTAL_MWP-+totalMwpInstalled).toFixed(2)} MWp`, sub:`${T-pvDone} tables`, color:phaseColors.sp},
+                  {label:"PV installed (executed)",    val:`${(pvExecuted*mwpPerTable).toFixed(2)} MWp`,    sub:`${pvExecuted} tables`,               color:phaseColors.pv},
+                  {label:"Remaining",       val:`${(TOTAL_MWP-pvExecuted*mwpPerTable).toFixed(2)} MWp`, sub:`${T-pvExecuted} tables`, color:phaseColors.sp},
                 ].map(k=>(
                   <div key={k.label} style={{background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px",textAlign:"center"}}>
                     <div style={{fontSize:9,color:"#555",letterSpacing:1,marginBottom:4}}>{k.label.toUpperCase()}</div>
@@ -1347,7 +1377,7 @@ export default function SolarPark() {
                           );
                           const PendCell = ({pend, sep}) => (
                             <td style={{padding:"4px 8px",textAlign:"center",color:"#444",fontVariantNumeric:"tabular-nums",fontSize:10}}>
-                              {pend>0?<span style={{color:"#555"}}>-{pend}</span>:"—"}
+                              {pend>0?<span style={{color:"#555"}}>{pend}</span>:"—"}
                             </td>
                           );
                           return (
