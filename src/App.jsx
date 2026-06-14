@@ -778,7 +778,7 @@ export default function SolarPark() {
                     <span style={{flex:1}}/>
                     <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>MS</span>
                     <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>PV</span>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>asgn</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>Assigned</span>
                   </div>
                   <div style={{fontSize:7,color:"#444",paddingLeft:27,marginBottom:3}}>contracted · · assigned</div>
                   {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
