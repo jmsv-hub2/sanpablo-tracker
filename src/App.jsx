@@ -773,13 +773,14 @@ export default function SolarPark() {
                   </div>
                 </div>
                 {!collapseSubcons && <>
-                  <div style={{display:"flex",padding:"1px 4px 2px",marginBottom:1,borderBottom:"1px solid #1a1a2e"}}>
+                  <div style={{display:"flex",padding:"1px 4px 3px",marginBottom:2,borderBottom:"1px solid #1a1a2e"}}>
                     <div style={{width:23,flexShrink:0}}/>
                     <span style={{flex:1}}/>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"right",flexShrink:0}}>c.MS</span>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"right",flexShrink:0}}>c.PV</span>
-                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"right",flexShrink:0}}>asgn</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>MS</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>PV</span>
+                    <span style={{fontSize:7,color:"#444",width:26,textAlign:"center",flexShrink:0}}>asgn</span>
                   </div>
+                  <div style={{fontSize:7,color:"#333",paddingLeft:27,marginBottom:3}}>contracted · · assigned</div>
                   {subAssignMode && <div style={{fontSize:9,color:"#818cf8",marginBottom:4,paddingLeft:2}}>Click sub → click/drag tables</div>}
                   {subs.map(s => {
                     const mwp = (s.tables.length * 30 * 615 / 1e6).toFixed(2);
@@ -801,9 +802,9 @@ export default function SolarPark() {
                               background:"transparent",border:`2px solid ${s.color}`,
                               outline:isColorOpen?"2px solid #fff":"none",outlineOffset:1}}/>
                           <span style={{flex:1,fontSize:10,color:isTarget?"#fff":"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:isTarget?700:400}}>{s.name}</span>
-                          <span style={{fontSize:9,color:(s.contractedMS||0)>0?"#aaa":"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedMS||"—"}</span>
-                          <span style={{fontSize:9,color:(s.contractedPV||0)>0?"#aaa":"#2a2a3a",width:26,textAlign:"right",flexShrink:0}}>{s.contractedPV||"—"}</span>
-                          <span style={{fontSize:10,color:"#888",width:26,textAlign:"right",flexShrink:0}}>{s.tables.length}</span>
+                          <span style={{fontSize:9,color:(s.contractedMS||0)>0?"#aaa":"#2a2a3a",width:26,textAlign:"center",flexShrink:0}}>{s.contractedMS||"—"}</span>
+                          <span style={{fontSize:9,color:(s.contractedPV||0)>0?"#aaa":"#2a2a3a",width:26,textAlign:"center",flexShrink:0}}>{s.contractedPV||"—"}</span>
+                          <span style={{fontSize:10,color:"#888",width:26,textAlign:"center",flexShrink:0}}>{s.tables.length}</span>
                         </div>
                         {isColorOpen && (
                           <div style={{padding:"6px 6px 7px",marginBottom:3,background:"#12121f",borderRadius:4,border:`1px solid ${s.color}44`}}>
@@ -839,9 +840,9 @@ export default function SolarPark() {
                       <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",marginTop:3,borderTop:"1px solid #1e1e35",paddingTop:4}}>
                         <div style={{width:18,height:8,borderRadius:2,background:"transparent",flexShrink:0,border:"1px solid #2d2d4a"}}/>
                         <span style={{flex:1,fontSize:9,color:"#888",fontWeight:600}}>Total</span>
-                        <span style={{fontSize:9,color:"#777",width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedMS||0),0)||"—"}</span>
-                        <span style={{fontSize:9,color:"#777",width:26,textAlign:"right",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedPV||0),0)||"—"}</span>
-                        <span style={{fontSize:9,color:"#888",width:26,textAlign:"right",flexShrink:0}}>{totalAsgn}</span>
+                        <span style={{fontSize:9,color:"#777",width:26,textAlign:"center",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedMS||0),0)||"—"}</span>
+                        <span style={{fontSize:9,color:"#777",width:26,textAlign:"center",flexShrink:0}}>{subs.reduce((a,s)=>a+(s.contractedPV||0),0)||"—"}</span>
+                        <span style={{fontSize:9,color:"#888",width:26,textAlign:"center",flexShrink:0}}>{totalAsgn}</span>
                       </div>
                       <div style={{height:1,background:"#1a1a2e",margin:"4px 0 3px"}}/>
                       <div style={{display:"flex",alignItems:"center",gap:5,padding:"1px 4px"}}>
@@ -1159,12 +1160,12 @@ export default function SolarPark() {
                   <div onClick={()=>setColorPickerId(colorPickerId===sub.id?null:sub.id)}
                     style={{width:10,height:10,borderRadius:2,background:sub.color,flexShrink:0,cursor:"pointer",
                       outline:colorPickerId===sub.id?"2px solid #fff":"none",outlineOffset:1}}/>
-                  {/* Name */}
-                  <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",minWidth:60,maxWidth:120,flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub.name}</span>
+                  {/* Name — fixed 150px so grid always starts at same X */}
+                  <span style={{fontWeight:700,fontSize:13,color:"#e0e0e8",width:150,flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub.name}</span>
                   {/* Divider */}
-                  <div style={{width:1,height:28,background:"#1e1e35",flexShrink:0}}/>
-                  {/* Contracted + Assigned grid */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,flex:1,minWidth:0}}>
+                  <div style={{width:1,height:40,background:"#1e1e35",flexShrink:0}}/>
+                  {/* Contracted + Assigned — fixed px columns, never flex */}
+                  <div style={{display:"grid",gridTemplateColumns:"110px 110px 90px",gap:6,flexShrink:0}}>
                     {[
                       {key:"contractedMS",label:"Contracted MS",color:phaseColors.ms},
                       {key:"contractedPV",label:"Contracted PV",color:phaseColors.pv},
@@ -1172,8 +1173,8 @@ export default function SolarPark() {
                       const val = sub[key]||0;
                       const mwp = (val*30*615/1e6).toFixed(1);
                       return (
-                        <div key={key} style={{background:"#0d0d1a",borderRadius:5,padding:"6px 8px",border:`1px solid ${val?color+"22":"#1a1a2e"}`}}>
-                          <div style={{fontSize:8,color:"#555",marginBottom:3}}>{label.toUpperCase()}</div>
+                        <div key={key} style={{background:"#0d0d1a",borderRadius:5,padding:"5px 8px",border:`1px solid ${val?color+"22":"#1a1a2e"}`}}>
+                          <div style={{fontSize:8,color:"#555",marginBottom:2}}>{label.toUpperCase()}</div>
                           {canEdit ? (
                             <input type="number" min={0} value={val||""} placeholder="—"
                               onChange={e=>setSubs(prev=>prev.map(s=>s.id===sub.id?{...s,[key]:+e.target.value||0,contracted:key==="contractedMS"?Math.max(+e.target.value||0,s.contractedPV||0):Math.max(s.contractedMS||0,+e.target.value||0)}:s))}
@@ -1186,13 +1187,27 @@ export default function SolarPark() {
                         </div>
                       );
                     })}
-                    <div style={{background:"#0d0d1a",borderRadius:5,padding:"6px 8px",border:`1px solid ${overAssigned?"#7f1d1d":"#1a1a2e"}`}}>
-                      <div style={{fontSize:8,color:"#555",marginBottom:3}}>ASSIGNED</div>
+                    <div style={{background:"#0d0d1a",borderRadius:5,padding:"5px 8px",border:`1px solid ${overAssigned?"#7f1d1d":"#1a1a2e"}`}}>
+                      <div style={{fontSize:8,color:"#555",marginBottom:2}}>ASSIGNED</div>
                       <div style={{fontSize:15,fontWeight:600,color:overAssigned?"#f87171":"#e0e0e8"}}>{assigned}</div>
                       <div style={{fontSize:8,color:"#444",marginTop:1}}>{mwpSub} MWp</div>
                     </div>
                   </div>
-                  {/* Remove */}
+                  {/* Divider */}
+                  <div style={{width:1,height:40,background:"#1e1e35",flexShrink:0}}/>
+                  {/* Progress bars */}
+                  <div style={{width:110,flexShrink:0}}>
+                    <div style={{fontSize:7,color:"#444",marginBottom:4,letterSpacing:.3}}>PROGRESS (assigned)</div>
+                    {[{label:"MS",val:msP,color:phaseColors.ms},{label:"PV",val:pvP,color:phaseColors.pv}].map(({label,val,color})=>(
+                      <div key={label} style={{display:"flex",alignItems:"center",gap:4,marginBottom:4}}>
+                        <span style={{fontSize:8,color:"#555",width:14,flexShrink:0}}>{label}</span>
+                        <div style={{flex:1,height:2,background:"#1a1a2e",borderRadius:1,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:val+"%",background:color,borderRadius:1}}/>
+                        </div>
+                        <span style={{fontSize:8,color:"#666",width:22,textAlign:"right",flexShrink:0}}>{val}%</span>
+                      </div>
+                    ))}
+                  </div>
                   {canEdit && (confirmRemove===sub.id ? (
                     <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
                       <span style={{fontSize:10,color:"#f87171"}}>Remove?</span>
