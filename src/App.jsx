@@ -69,10 +69,10 @@ async function loadFromSheets() {
     dataJson.data.forEach(row => {
       phases[row.id] = parseInt(row.phase) || 0;
       if (row.subcontractor_ms) {
-        if (!subsMap[row.subcontractor]) subsMap[row.subcontractor] = [];
-        subsMap[row.subcontractor].push(row.id);
+        if (!subsMap[row.subcontractor_ms]) subsMap[row.subcontractor_ms] = [];
+        subsMap[row.subcontractor_ms].push(row.id);
       }
-      if (row.subcontractor_pv) {
+      if (row.subcontractor_pv && row.subcontractor_pv !== row.subcontractor_ms) {
         pvMap[row.id] = row.subcontractor_pv;
       }
     });
