@@ -165,6 +165,10 @@ export default function SolarPark() {
   const [showSubs, setShowSubs]           = useState(false);
   const [collapsePhases, setCollapsePhases] = useState(false);
   const [collapseSubcons, setCollapseSubcons] = useState(true);
+  const [unassignMode, setUnassignMode] = useState(false);
+  const [selRect, setSelRect]           = useState(null);
+  const [selResult, setSelResult]       = useState(null);
+  const selStartRef = useRef(null);
   const [collapseMvps, setCollapseMvps]   = useState(true);
   const [subFilter, setSubFilter]         = useState(null); 
   const [showPhases, setShowPhases]       = useState(true);
@@ -376,7 +380,10 @@ export default function SolarPark() {
     const subName = subs.find(s=>s.id===subId)?.name||"";
     const existingMS = subs.find(s => s.tables.includes(tid));
     if(existingMS && existingMS.id !== subId) {
-      // Table already has an MS subcon → assign as PV only
+      // Table already has an MS subcon → assign as PV, add to this sub's tables too
+      setSubs(prev => prev.map(s =>
+        s.id === subId ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]} : s
+      ));
       setSubconPV(prev => ({...prev, [tid]: subName}));
       schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
     } else {
@@ -391,34 +398,35 @@ export default function SolarPark() {
     }
   }, [phases, schedulePush, subs]);
   const toggleSubTable = useCallback((subId, tid) => {
-    setSubs(prev => {
-      const alreadyOwned = prev.find(s => s.id === subId)?.tables.includes(tid);
-      const existingMS = prev.find(s => s.id !== subId && s.tables.includes(tid));
-      const nowAssigned = !alreadyOwned;
-      const subName = prev.find(s=>s.id===subId)?.name||"";
-      let next;
-      if(nowAssigned && existingMS) {
-        // Second subcon on this table → assign as PV only, keep MS subcon's tables intact
-        next = prev.map(s =>
-          s.id === subId ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]} : s
-        );
-        schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
-        setSubconPV(p => ({...p, [tid]: subName}));
-      } else {
-        // Normal exclusive assignment or removal
-        next = prev.map(s => {
-          if(s.id === subId) return {...s, tables: alreadyOwned ? s.tables.filter(x=>x!==tid) : [...s.tables, tid]};
-          return {...s, tables: s.tables.filter(x => x !== tid)};
-        });
-        schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: nowAssigned ? subName : "", subcontractor_pv: nowAssigned ? subName : "" }]);
-        setSubconPV(p => { const n={...p}; if(nowAssigned) n[tid]=subName; else delete n[tid]; return n; });
-      }
-      return next;
-    });
-  }, [phases, schedulePush]);
+    const alreadyOwned = subs.find(s => s.id === subId)?.tables.includes(tid);
+    const existingMS = subs.find(s => s.id !== subId && s.tables.includes(tid));
+    const nowAssigned = !alreadyOwned;
+    const subName = subs.find(s=>s.id===subId)?.name||"";
+    if(nowAssigned && existingMS) {
+      setSubs(prev => prev.map(s =>
+        s.id === subId ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]} : s
+      ));
+      setSubconPV(p => ({...p, [tid]: subName}));
+      schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
+    } else {
+      setSubs(prev => prev.map(s => {
+        if(s.id === subId) return {...s, tables: alreadyOwned ? s.tables.filter(x=>x!==tid) : [...s.tables, tid]};
+        return {...s, tables: s.tables.filter(x => x !== tid)};
+      }));
+      setSubconPV(p => { const n={...p}; if(nowAssigned) n[tid]=subName; else delete n[tid]; return n; });
+      schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: nowAssigned ? subName : "", subcontractor_pv: nowAssigned ? subName : "" }]);
+    }
+  }, [phases, schedulePush, subs]);
   const click = useCallback((id, e) => {
     e.stopPropagation();
-    if(subAssignMode && subAssignId) { toggleSubTable(subAssignId, id); return; }
+    if(subAssignMode && subAssignId) {
+      if(unassignMode) {
+        setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
+        setSubconPV(prev=>{ const n={...prev}; delete n[id]; return n; });
+        schedulePush([{ id, phase:phases?.[id]||0, subcontractor_ms:"", subcontractor_pv:"" }]);
+      } else { toggleSubTable(subAssignId, id); }
+      return;
+    }
     if(!showPhases) return; // phases OFF — no changes allowed
     if(paintMode) { applyPhase(id); return; }
     const newPh = ((phases?.[id]||0)+1) % 7;
@@ -444,7 +452,13 @@ export default function SolarPark() {
   const handleEnter = useCallback((id, e) => {
     const t = TABLES.find(t=>t.id===id);
     setTooltip({id, ph:PHASES[Math.min(phases?.[id]||0, PHASES.length-1)].label, mv:t?.m, x:e.clientX, y:e.clientY});
-    if(subAssignMode && subAssignId && isPainting.current) addToSub(subAssignId, id);
+    if(subAssignMode && subAssignId && isPainting.current) {
+      if(unassignMode) {
+        setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
+        setSubconPV(prev=>{ const n={...prev}; delete n[id]; return n; });
+        schedulePush([{ id, phase:phases?.[id]||0, subcontractor_ms:"", subcontractor_pv:"" }]);
+      } else addToSub(subAssignId, id);
+    }
     else if(paintMode && isPainting.current) applyPhase(id);
   }, [paintMode, applyPhase, phases, subAssignMode, subAssignId, addToSub, TABLES]);
   const setPhase = useCallback((id, ph) => {
@@ -459,6 +473,13 @@ export default function SolarPark() {
     setCtx(null);
   }, [TABLES, schedulePush, getSubForTable]);
   const onSvgMouseDown = useCallback((e) => {
+    if(e.shiftKey) {
+      e.preventDefault();
+      selStartRef.current = { x:e.clientX, y:e.clientY };
+      setSelRect({ x0:e.clientX, y0:e.clientY, x1:e.clientX, y1:e.clientY });
+      setSelResult(null);
+      return;
+    }
     if(paintMode) { isPainting.current=true; return; }
     if(subAssignMode) {
       isPainting.current=true;
@@ -475,12 +496,42 @@ export default function SolarPark() {
       if(canvasRef.current) canvasRef.current.style.cursor = "grabbing";
     }
   }, [paintMode, subAssignMode]);
-  const onSvgMouseUp = useCallback(() => {
+  const onSvgMouseUp = useCallback((e) => {
+    if(selStartRef.current) {
+      const r = { x0:selStartRef.current.x, y0:selStartRef.current.y, x1:e.clientX, y1:e.clientY };
+      selStartRef.current = null;
+      const el = canvasRef.current;
+      if(el && Math.abs(r.x1-r.x0)>8 && Math.abs(r.y1-r.y0)>8) {
+        const bbox = el.getBoundingClientRect();
+        const sc=vRef.current.z, ox=vRef.current.x, oy=vRef.current.y;
+        const toLoc=(sx,sy)=>({ lx:(sx-bbox.left-ox)/sc, ly:(sy-bbox.top-oy)/sc });
+        const tl=toLoc(Math.min(r.x0,r.x1),Math.min(r.y0,r.y1));
+        const br=toLoc(Math.max(r.x0,r.x1),Math.max(r.y0,r.y1));
+        setSelRect({...r, done:true});
+        const matched=TABLES.filter(t=>{
+          const tx=t.x+ROX, ty=t.y+ROY;
+          if(tx+RW<tl.lx||tx>br.lx||ty+RH<tl.ly||ty>br.ly) return false;
+          const ph=phases?.[t.id]||0;
+          const pDim=showPhases&&((pf.size>0&&!pf.has(ph))||(bf!==null&&t.m!==bf));
+          const sDim=showSubs&&((subFilter!==null&&!subs.find(s=>s.id===subFilter)?.tables.includes(t.id))||(bf!==null&&t.m!==bf));
+          return !pDim&&!sDim;
+        });
+        const byPhase={};
+        PHASE_DEFS.forEach(p=>{byPhase[p.id]=[];});
+        matched.forEach(t=>{byPhase[phases?.[t.id]||0].push(t);});
+        setSelResult({total:matched.length,byPhase,mwpPer:30*615/1e6,rect:r});
+      } else { setSelRect(null); }
+      return;
+    }
     isPainting.current = false;
     dragStart.current = null;
-    if(canvasRef.current) canvasRef.current.style.cursor = subAssignMode ? "cell" : paintMode ? "crosshair" : "grab";
-  }, [paintMode, subAssignMode]);
+    if(canvasRef.current) canvasRef.current.style.cursor = subAssignMode?"cell":paintMode?"crosshair":"grab";
+  }, [paintMode, subAssignMode, phases, showPhases, showSubs, pf, bf, subFilter, subs, TABLES]);
   const onMouseMove = useCallback((e) => {
+    if(selStartRef.current && e.buttons===1) {
+      setSelRect({x0:selStartRef.current.x,y0:selStartRef.current.y,x1:e.clientX,y1:e.clientY});
+      return;
+    }
     if(!dragStart.current) return;
     vRef.current.x = dragStart.current.px + (e.clientX - dragStart.current.mx);
     vRef.current.y = dragStart.current.py + (e.clientY - dragStart.current.my);
@@ -793,17 +844,23 @@ export default function SolarPark() {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",cursor:"pointer"}}
                   onClick={()=>setCollapseSubcons(s=>!s)}>
                   <span style={{fontSize:10,color:"#aaa",letterSpacing:1,fontWeight:700}}>SUBCONS {collapseSubcons?"▸":"▾"}</span>
-                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                    <button onClick={e=>{e.stopPropagation(); if(!canEdit){showToast();return;} setSubAssignMode(m=>{ const next=!m; if(next) setShowSubs(true); return next; }); setPaintMode(false);}}
-                      style={{background:subAssignMode?"#818cf8":"#1e1e35",border:`1px solid ${subAssignMode?"#818cf8":"#2d2d4a"}`,color:subAssignMode?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
-                      {subAssignMode?"ASSIGN ✓":"ASSIGN"}
+                  <button onClick={e=>{e.stopPropagation(); setShowSubs(s=>{ const next=!s; if(!next){setSubAssignMode(false);setUnassignMode(false);} return next; });}}
+                    style={{background:showSubs?"#818cf8":"#1e1e35",border:`1px solid ${showSubs?"#818cf8":"#2d2d4a"}`,color:showSubs?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                    {showSubs?"ON":"OFF"}
+                  </button>
+                </div>
+                {!collapseSubcons && canEdit && (
+                  <div style={{display:"flex",gap:4,margin:"4px 0"}}>
+                    <button onClick={e=>{e.stopPropagation();setSubAssignMode(m=>!m);setUnassignMode(false);setPaintMode(false);}}
+                      style={{flex:1,background:subAssignMode&&!unassignMode?"#818cf8":"#1e1e35",border:`1px solid ${subAssignMode&&!unassignMode?"#818cf8":"#2d2d4a"}`,color:subAssignMode&&!unassignMode?"#000":"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                      {subAssignMode&&!unassignMode?"ASSIGN ✓":"ASSIGN"}
                     </button>
-                    <button onClick={e=>{e.stopPropagation(); setShowSubs(s=>{ const next=!s; if(!next) setSubAssignMode(false); return next; });}}
-                      style={{background:showSubs?"#818cf8":"#1e1e35",border:`1px solid ${showSubs?"#818cf8":"#2d2d4a"}`,color:showSubs?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>
-                      {showSubs?"ON":"OFF"}
+                    <button onClick={e=>{e.stopPropagation();setUnassignMode(m=>!m);setSubAssignMode(true);setPaintMode(false);}}
+                      style={{flex:1,background:unassignMode?"#f87171":"#1e1e35",border:`1px solid ${unassignMode?"#f87171":"#2d2d4a"}`,color:unassignMode?"#000":"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                      {unassignMode?"REMOVE ✓":"REMOVE"}
                     </button>
                   </div>
-                </div>
+                )}
                 {!collapseSubcons && <>
                   <div style={{display:"flex",gap:5,padding:"1px 4px 3px",marginBottom:2,borderBottom:"1px solid #1a1a2e",alignItems:"center"}}>
                     <div style={{width:18,flexShrink:0}}/>
@@ -954,14 +1011,14 @@ export default function SolarPark() {
                   const dim = phaseDim || subDim;
                   const grp = ph<=2?"sp":ph<=4?"ms":"pv";
                   const opac = ph===0 ? 1 : (phaseOpacity[grp]??1);
-                  const fillColor = dim ? PHASES[0].color : showPhases ? p.color : (showSubs && subCol) ? subCol : PHASES[0].color;
-                  const fillOpacity = dim ? 1 : (showPhases ? opac : (showSubs && subCol) ? 0.55 : 1);
+                  const fillColor = phaseDim ? PHASES[0].color : showPhases ? p.color : (showSubs && subCol) ? subCol : PHASES[0].color;
+                  const fillOpacity = phaseDim ? 1 : (showPhases ? opac : (showSubs && subCol) ? 0.55 : 1);
                   // Easter egg: rainbow flash, speed escalates over 3.2s
                   const eggColor = (easterEgg === 'flashing' || easterEgg === 'message')
                     ? `hsl(${(eggTick*4 + t.x*0.2 + t.y*0.2) % 360},100%,55%)` : null;
                   const subOpacHex = subCol ? Math.round(((subs.find(s=>s.tables.includes(t.id))?.opacity??1)*255)).toString(16).padStart(2,'0') : 'ff';
-                  const strokeColor = (showSubs && subCol && !dim) ? subCol+subOpacHex : PHASES[0].border;
-                  const strokeW = (showSubs && subCol && !dim) ? 0.8 : 0.15;
+                  const strokeColor = (showSubs && subCol && !phaseDim) ? subCol+subOpacHex : PHASES[0].border;
+                  const strokeW = (showSubs && subCol && !phaseDim) ? 0.8 : 0.15;
                   const opacity = 1;
                   const hasDualSub = subconPV[t.id] && subconPV[t.id] !== getSubForTable(t.id);
                   const tx = t.x+ROX, ty = t.y+ROY;
@@ -1056,9 +1113,45 @@ export default function SolarPark() {
             {subAssignMode && activeSub && (
               <div style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",background:"#12121f",border:`1px solid ${activeSub.color}`,borderRadius:20,padding:"5px 16px",fontSize:11,color:activeSub.color,pointerEvents:"none",zIndex:50,display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:8,height:8,borderRadius:2,background:activeSub.color}}/>
-                Assigning to: <b>{activeSub.name}</b> · {activeSub.tables.length} tables
+                {unassignMode?"Removing from":"Assigning to"}: <b>{activeSub.name}</b> · {activeSub.tables.length} tables
               </div>
             )}
+            {/* Selection rect */}
+            {selRect && !selRect.done && (()=>{
+              const cb=canvasRef.current?.getBoundingClientRect()||{left:0,top:0};
+              return <div style={{position:"absolute",left:Math.min(selRect.x0,selRect.x1)-cb.left,top:Math.min(selRect.y0,selRect.y1)-cb.top,width:Math.abs(selRect.x1-selRect.x0),height:Math.abs(selRect.y1-selRect.y0),border:"1.5px dashed #818cf8",background:"rgba(129,140,248,0.07)",pointerEvents:"none",zIndex:150}}/>;
+            })()}
+            {/* Selection result panel */}
+            {selResult && (()=>{
+              const cb=canvasRef.current?.getBoundingClientRect()||{left:0,top:0,width:800,height:600};
+              const rx0=Math.min(selResult.rect.x0,selResult.rect.x1)-cb.left;
+              const rx1=Math.max(selResult.rect.x0,selResult.rect.x1)-cb.left;
+              const ry0=Math.min(selResult.rect.y0,selResult.rect.y1)-cb.top;
+              let left=rx1+10; if(left+215>cb.width) left=Math.max(4,rx0-225);
+              let top=ry0; if(top+240>cb.height) top=Math.max(4,cb.height-244);
+              return (
+                <div style={{position:"absolute",left,top,width:210,background:"#0d0d1a",border:"1px solid #818cf8",borderRadius:7,padding:"10px 12px",zIndex:160,boxShadow:"0 4px 24px rgba(0,0,0,.8)",fontSize:11}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{fontWeight:700,color:"#818cf8",fontSize:12}}>Selection</span>
+                    <button onClick={()=>{setSelResult(null);setSelRect(null);}} style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:16,lineHeight:1,padding:0}}>×</button>
+                  </div>
+                  <div style={{color:"#888",fontSize:10,marginBottom:6}}>{selResult.total} tables · {(selResult.total*selResult.mwpPer).toFixed(2)} MWp</div>
+                  <div style={{height:1,background:"#1e1e35",marginBottom:6}}/>
+                  {PHASE_DEFS.map(p=>{
+                    const n=selResult.byPhase[p.id]?.length||0;
+                    if(!n) return null;
+                    const ph=PHASES[p.id];
+                    return <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                      <div style={{width:8,height:8,borderRadius:1,background:ph.color,flexShrink:0}}/>
+                      <span style={{flex:1,color:"#aaa",fontSize:10}}>{p.label}</span>
+                      <span style={{color:"#ccc",fontWeight:600,flexShrink:0}}>{n}</span>
+                      <span style={{color:"#555",fontSize:9,width:38,textAlign:"right",flexShrink:0}}>{(n*selResult.mwpPer).toFixed(1)} MWp</span>
+                    </div>;
+                  })}
+                  <div style={{fontSize:8,color:"#333",marginTop:6}}>Shift+drag to reselect</div>
+                </div>
+              );
+            })()}
             {/* ── Easter egg overlay ── */}
             {(easterEgg === 'message' || easterEgg === 'fadeout') && (
               <div style={{
