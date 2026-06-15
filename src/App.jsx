@@ -783,7 +783,7 @@ export default function SolarPark() {
                   <span style={{fontSize:8,color:"#333",width:24,textAlign:"right",flexShrink:0}}>tables</span>
                   <span style={{fontSize:8,color:"#333",width:32,textAlign:"right",flexShrink:0}}>MWp</span>
                 </div>
-                <div style={{fontSize:7,color:"#444",marginBottom:4,paddingLeft:4}}>Ctrl+click for multiselection</div>
+                <div style={{fontSize:9,color:"#666",marginBottom:4,paddingLeft:4}}>Ctrl+click for multiselection</div>
                 {PHASES.map(p=>{
                   const groupKey = p.id===0 ? null : p.id<=2?"sp":p.id<=4?"ms":"pv";
                   const isOpen = groupKey && colorPickerId===`phase_${groupKey}`;
@@ -987,7 +987,7 @@ export default function SolarPark() {
             <div style={{marginTop:4,padding:6,background:"#0d0d1a",borderRadius:4,border:"1px solid #1a1a2e",fontSize:9,color:"#666",lineHeight:1.9}}>
               🖱 Click = next phase<br/>
               🖱 Right-click = phase menu<br/>
-              🔍 Scroll = zoom · ✋ Drag
+              🔍 Scroll = zoom · ✋ Drag<br/>
               Shift+drag: area select
             </div>
           </div>
