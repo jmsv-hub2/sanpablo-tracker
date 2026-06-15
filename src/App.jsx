@@ -14,7 +14,7 @@ function makePhases(cols) {
   const darken = (h,f) => { const [r,g,b]=hex2rgb(h); return `rgb(${Math.round(r*f)},${Math.round(g*f)},${Math.round(b*f)})`; };
   const lighten = (h,f) => { const [r,g,b]=hex2rgb(h); return `rgb(${Math.min(255,Math.round(r+(255-r)*f))},${Math.min(255,Math.round(g+(255-g)*f))},${Math.min(255,Math.round(b+(255-b)*f))})`; };
   return [
-    { id:0, label:"Not started",                   color:"#1a1a2e", border:"#2d2d4a" },
+    { id:0, label:"Not started",                   color:"#22223a", border:"#353555" },
     { id:1, label:"Screwpiles pending inspection", color:darken(cols.sp,0.45), border:lighten(cols.sp,0.2) },
     { id:2, label:"Screwpiles approved",           color:cols.sp,              border:lighten(cols.sp,0.5) },
     { id:3, label:"MS pending inspection",         color:darken(cols.ms,0.45), border:lighten(cols.ms,0.2) },
