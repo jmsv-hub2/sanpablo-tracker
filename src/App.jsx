@@ -988,7 +988,7 @@ export default function SolarPark() {
               🖱 Click = next phase<br/>
               🖱 Right-click = phase menu<br/>
               🔍 Scroll = zoom · ✋ Drag<br/>
-              Shift+drag: area select
+              ⬚ Shift+drag: area select
             </div>
           </div>
           <div ref={canvasRef} style={{flex:1,overflow:"hidden",position:"relative",cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"grab"):"default"}}>
