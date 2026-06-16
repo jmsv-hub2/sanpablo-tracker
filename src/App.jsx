@@ -1035,7 +1035,7 @@ export default function SolarPark() {
                         fillOpacity={eggColor ? 1 : fillOpacity}
                         stroke={strokeColor}
                         strokeWidth={strokeW}/>
-                      {hasDualSub && !dim && (
+                      {hasDualSub && showSubs && !phaseDim && (
                         <line x1={tx} y1={ty+RH} x2={tx+RW} y2={ty}
                           stroke="rgba(255,255,255,0.75)" strokeWidth={0.5}
                           pointerEvents="none"/>
