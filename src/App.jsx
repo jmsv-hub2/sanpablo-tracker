@@ -97,9 +97,9 @@ async function loadFromSheets() {
     } catch(e) {}
     // Build final subs: prefer config (preserves order/color/contracted) else sheets map
     const finalSubs = subsFromConfig || buildSubs(Object.entries(subsMap).map(([name, tables]) => ({id:name,name,tables})));
-    return { phases, subs: finalSubs, colors, subconPV: pvMap, source: "sheets" };
+    return { phases, subs: finalSubs, colors, subconPV: pvMap, subconMS: msMap, source: "sheets" };
   } catch(e) {
-    return { phases: {...INITIAL_PHASES}, subs: INITIAL_SUBS.map((s,i)=>({...s,color:SUB_COLORS[i%SUB_COLORS.length]})), colors: null, subconPV: {}, source: "embedded" };
+    return { phases: {...INITIAL_PHASES}, subs: INITIAL_SUBS.map((s,i)=>({...s,color:SUB_COLORS[i%SUB_COLORS.length]})), colors: null, subconPV: {}, subconMS: {}, source: "embedded" };
   }
 }
 async function pushToSheets(updates) {
@@ -166,6 +166,7 @@ export default function SolarPark() {
   const [subAssignMode, setSubAssignMode] = useState(false);
   const [subAssignId, setSubAssignId]     = useState(null);
   const [subconPV, setSubconPV]           = useState({}); // tableId → subName for PV scope
+  const [subconMS, setSubconMS]           = useState({}); // tableId → subName for MS scope
   const [showSubs, setShowSubs]           = useState(false);
   const [collapsePhases, setCollapsePhases] = useState(false);
   const [collapseSubcons, setCollapseSubcons] = useState(true);
@@ -294,6 +295,7 @@ export default function SolarPark() {
           color: s.color || colorMap[s.id] || s.color,
         })));
         if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
+        if(sheetsData.subconMS) setSubconMS(sheetsData.subconMS);
         setLoaded(true);
         if(sheetsData.source === "sheets") {
           setSyncStatus("ok");
@@ -384,19 +386,19 @@ export default function SolarPark() {
     const subName = subs.find(s=>s.id===subId)?.name||"";
     const existingMS = subs.find(s => s.tables.includes(tid));
     if(existingMS && existingMS.id !== subId) {
-      // Table already has an MS subcon → assign as PV, add to this sub's tables too
       setSubs(prev => prev.map(s =>
         s.id === subId ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]} : s
       ));
+      setSubconMS(prev => ({...prev, [tid]: existingMS.name}));
       setSubconPV(prev => ({...prev, [tid]: subName}));
       schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
     } else {
-      // No existing MS → assign as both MS and PV
       setSubs(prev => prev.map(s =>
         s.id === subId
           ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]}
           : {...s, tables: s.tables.filter(x => x !== tid)}
       ));
+      setSubconMS(prev => ({...prev, [tid]: subName}));
       setSubconPV(prev => ({...prev, [tid]: subName}));
       schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: subName, subcontractor_pv: subName }]);
     }
@@ -410,6 +412,7 @@ export default function SolarPark() {
       setSubs(prev => prev.map(s =>
         s.id === subId ? {...s, tables: s.tables.includes(tid) ? s.tables : [...s.tables, tid]} : s
       ));
+      setSubconMS(p => ({...p, [tid]: existingMS.name}));
       setSubconPV(p => ({...p, [tid]: subName}));
       schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: existingMS.name, subcontractor_pv: subName }]);
     } else {
@@ -417,6 +420,7 @@ export default function SolarPark() {
         if(s.id === subId) return {...s, tables: alreadyOwned ? s.tables.filter(x=>x!==tid) : [...s.tables, tid]};
         return {...s, tables: s.tables.filter(x => x !== tid)};
       }));
+      setSubconMS(p => { const n={...p}; if(nowAssigned) n[tid]=subName; else delete n[tid]; return n; });
       setSubconPV(p => { const n={...p}; if(nowAssigned) n[tid]=subName; else delete n[tid]; return n; });
       schedulePush([{ id: tid, phase: phases?.[tid]||0, subcontractor_ms: nowAssigned ? subName : "", subcontractor_pv: nowAssigned ? subName : "" }]);
     }
@@ -426,6 +430,7 @@ export default function SolarPark() {
     if(subAssignMode && subAssignId) {
       if(unassignMode) {
         setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
+        setSubconMS(prev=>{ const n={...prev}; delete n[id]; return n; });
         setSubconPV(prev=>{ const n={...prev}; delete n[id]; return n; });
         schedulePush([{ id, phase:phases?.[id]||0, subcontractor_ms:"", subcontractor_pv:"" }]);
       } else { toggleSubTable(subAssignId, id); }
@@ -459,6 +464,7 @@ export default function SolarPark() {
     if(subAssignMode && subAssignId && isPainting.current) {
       if(unassignMode) {
         setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
+        setSubconMS(prev=>{ const n={...prev}; delete n[id]; return n; });
         setSubconPV(prev=>{ const n={...prev}; delete n[id]; return n; });
         schedulePush([{ id, phase:phases?.[id]||0, subcontractor_ms:"", subcontractor_pv:"" }]);
       } else addToSub(subAssignId, id);
@@ -484,12 +490,12 @@ export default function SolarPark() {
       setSelResult(null);
       return;
     }
-    if(paintMode) { isPainting.current=true; return; }
+    if(paintMode) { isPainting.current=true; dragStart.current=null; return; }
     if(subAssignMode) {
-      isPainting.current=true;
-      // Also allow pan when clicking empty canvas in assign mode
-      if(!e.target.closest("[data-id]")) {
-        isPainting.current=false;
+      if(e.target.closest("[data-id]")) {
+        isPainting.current=true;
+        dragStart.current=null;
+      } else {
         dragStart.current = { mx: e.clientX, my: e.clientY, px: vRef.current.x, py: vRef.current.y };
         if(canvasRef.current) canvasRef.current.style.cursor = "grabbing";
       }
@@ -498,6 +504,8 @@ export default function SolarPark() {
     if(!e.target.closest("[data-id]")) {
       dragStart.current = { mx: e.clientX, my: e.clientY, px: vRef.current.x, py: vRef.current.y };
       if(canvasRef.current) canvasRef.current.style.cursor = "grabbing";
+    } else {
+      dragStart.current = null;
     }
   }, [paintMode, subAssignMode]);
   const onSvgMouseUp = useCallback((e) => {
@@ -1025,7 +1033,7 @@ export default function SolarPark() {
                   const strokeColor = (!dim && showSubs && subCol) ? subCol+subOpacHex : PHASES[0].border;
                   const strokeW = (!dim && showSubs && subCol) ? 0.8 : 0.15;
                   const opacity = 1;
-                  const hasDualSub = subconPV[t.id] && subconPV[t.id] !== getSubForTable(t.id);
+                  const hasDualSub = subconPV[t.id] && subconMS[t.id] && subconPV[t.id] !== subconMS[t.id];
                   const tx = t.x+ROX, ty = t.y+ROY;
                   return (
                     <g key={t.id}
@@ -1040,7 +1048,7 @@ export default function SolarPark() {
                         fillOpacity={eggColor ? 1 : fillOpacity}
                         stroke={strokeColor}
                         strokeWidth={strokeW}/>
-                      {hasDualSub && showSubs && !phaseDim && (
+                      {hasDualSub && showSubs && !dim && (
                         <line x1={tx} y1={ty+RH} x2={tx+RW} y2={ty}
                           stroke="rgba(255,255,255,0.75)" strokeWidth={0.5}
                           pointerEvents="none"/>
@@ -1083,9 +1091,9 @@ export default function SolarPark() {
                 <div style={{color:"#aaa",marginTop:1}}>MVPS {tooltip.mv} · {tooltip.ph}</div>
                 <div style={{color:"#666",fontSize:10,marginTop:1}}>30 panels · 18.45 kWp</div>
                 {subColorMap[tooltip.id] && (() => {
-                  const msName = subs.find(s=>s.tables.includes(tooltip.id))?.name;
+                  const msName = subconMS[tooltip.id] || subs.find(s=>s.tables.includes(tooltip.id))?.name;
                   const pvName = subconPV[tooltip.id];
-                  const hasDual = pvName && pvName !== msName;
+                  const hasDual = pvName && msName && pvName !== msName;
                   const msColor = subs.find(s=>s.name===msName)?.color||phaseColors.ms;
                   const pvColor = subs.find(s=>s.name===pvName)?.color||phaseColors.pv;
                   return hasDual ? (
@@ -1104,9 +1112,9 @@ export default function SolarPark() {
                 <div style={{fontWeight:700,color:"#fff"}}>{tooltip.id}</div>
                 {activeSub
                   ? (() => {
-                    const msName = subs.find(s=>s.tables.includes(tooltip.id))?.name;
+                    const msName = subconMS[tooltip.id] || subs.find(s=>s.tables.includes(tooltip.id))?.name;
                     const pvName = subconPV[tooltip.id];
-                    const hasDual = pvName && pvName !== msName;
+                    const hasDual = pvName && msName && pvName !== msName;
                     return <div style={{marginTop:1,fontSize:10}}>
                       {hasDual && <div style={{fontSize:9,marginBottom:1}}><span style={{color:phaseColors.ms}}>MS:{msName}</span> · <span style={{color:phaseColors.pv}}>PV:{pvName}</span></div>}
                       <div style={{color:activeSub.color}}>{subs.find(s=>s.tables.includes(tooltip.id))?.id===subAssignId?"Click to remove":"Click to assign"} → {activeSub.name}</div>
