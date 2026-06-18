@@ -1022,8 +1022,8 @@ export default function SolarPark() {
                   const eggColor = (easterEgg === 'flashing' || easterEgg === 'message')
                     ? `hsl(${(eggTick*4 + t.x*0.2 + t.y*0.2) % 360},100%,55%)` : null;
                   const subOpacHex = subCol ? Math.round(((subs.find(s=>s.tables.includes(t.id))?.opacity??1)*255)).toString(16).padStart(2,'0') : 'ff';
-                  const strokeColor = (showSubs && subCol && !phaseDim) ? subCol+subOpacHex : PHASES[0].border;
-                  const strokeW = (showSubs && subCol && !phaseDim) ? 0.8 : 0.15;
+                  const strokeColor = (!dim && showSubs && subCol) ? subCol+subOpacHex : PHASES[0].border;
+                  const strokeW = (!dim && showSubs && subCol) ? 0.8 : 0.15;
                   const opacity = 1;
                   const hasDualSub = subconPV[t.id] && subconPV[t.id] !== getSubForTable(t.id);
                   const tx = t.x+ROX, ty = t.y+ROY;
