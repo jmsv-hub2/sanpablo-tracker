@@ -1016,8 +1016,8 @@ export default function SolarPark() {
                   const dim = phaseDim || subDim;
                   const grp = ph<=2?"sp":ph<=4?"ms":"pv";
                   const opac = ph===0 ? 1 : (phaseOpacity[grp]??1);
-                  const fillColor = phaseDim ? PHASES[0].color : showPhases ? p.color : (showSubs && subCol) ? subCol : PHASES[0].color;
-                  const fillOpacity = phaseDim ? 1 : (showPhases ? opac : (showSubs && subCol) ? 0.55 : 1);
+                  const fillColor = dim ? PHASES[0].color : showPhases ? p.color : (showSubs && subCol) ? subCol : PHASES[0].color;
+                  const fillOpacity = dim ? 1 : (showPhases ? opac : (showSubs && subCol) ? 0.55 : 1);
                   // Easter egg: rainbow flash, speed escalates over 3.2s
                   const eggColor = (easterEgg === 'flashing' || easterEgg === 'message')
                     ? `hsl(${(eggTick*4 + t.x*0.2 + t.y*0.2) % 360},100%,55%)` : null;
