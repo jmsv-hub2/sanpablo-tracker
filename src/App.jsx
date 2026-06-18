@@ -84,10 +84,10 @@ async function loadFromSheets() {
         colors = cfgJson.config.phaseColors || null;
         // Merge subsMap tables into config subs
         if (cfgJson.config.subs) {
-          subsFromConfig = cfgJson.config.subs.map(s => ({
-            ...s,
-            tables: subsMap[s.name] || subsMap[s.id] || [],
-          }));
+          subsFromConfig = cfgJson.config.subs.map(s => {
+            const key = Object.keys(subsMap).find(k => k.trim().toLowerCase() === (s.name||'').trim().toLowerCase());
+            return { ...s, tables: (key ? subsMap[key] : subsMap[s.name] || subsMap[s.id]) || [] };
+          });
         }
       }
     } catch(e) {}
