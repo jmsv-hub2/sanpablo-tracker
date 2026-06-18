@@ -160,7 +160,7 @@ export default function SolarPark() {
   const [tooltip, setTooltip] = useState(null);
   const [ctx, setCtx]       = useState(null);
   const [pf, setPf]         = useState(new Set());
-  const [bf, setBf]         = useState(null);
+  const [bf, setBf]         = useState(new Set());
   const [paintMode, setPaintMode]     = useState(false);
   const [paintPhase, setPaintPhase]   = useState(6);
   const [subAssignMode, setSubAssignMode] = useState(false);
@@ -175,7 +175,7 @@ export default function SolarPark() {
   const [selResult, setSelResult]       = useState(null);
   const selStartRef = useRef(null);
   const [collapseMvps, setCollapseMvps]   = useState(true);
-  const [subFilter, setSubFilter]         = useState(null); 
+  const [subFilter, setSubFilter]         = useState(new Set());
   const [showPhases, setShowPhases]       = useState(true);
   const [showMvps, setShowMvps]           = useState(false);
   const [showLabels, setShowLabels]         = useState(false); 
@@ -267,10 +267,10 @@ export default function SolarPark() {
     setCollapseSubcons(true);
     setSubAssignMode(false);
     setSubAssignId(null);
-    setSubFilter(null);
+    setSubFilter(new Set());
     setShowMvps(false);
     setCollapseMvps(true);
-    setBf(null);
+    setBf(new Set());
     setPf(new Set());
     setPaintMode(false);
     setColorPickerId(null);
@@ -524,8 +524,8 @@ export default function SolarPark() {
           const tx=t.x+ROX, ty=t.y+ROY;
           if(tx+RW<tl.lx||tx>br.lx||ty+RH<tl.ly||ty>br.ly) return false;
           const ph=phases?.[t.id]||0;
-          const pDim=showPhases&&((pf.size>0&&!pf.has(ph))||(bf!==null&&t.m!==bf));
-          const sDim=showSubs&&((subFilter!==null&&!subs.find(s=>s.id===subFilter)?.tables.includes(t.id))||(bf!==null&&t.m!==bf));
+          const pDim=showPhases&&((pf.size>0&&!pf.has(ph))||(bf.size>0&&!bf.has(t.m)));
+          const sDim=showSubs&&((subFilter.size>0&&!subs.filter(s=>subFilter.has(s.id)).some(s=>s.tables.includes(t.id)))||(bf.size>0&&!bf.has(t.m)));
           return !pDim&&!sDim;
         });
         const byPhase={};
@@ -795,7 +795,6 @@ export default function SolarPark() {
                   <span style={{fontSize:8,color:"#333",width:24,textAlign:"right",flexShrink:0}}>tables</span>
                   <span style={{fontSize:8,color:"#333",width:32,textAlign:"right",flexShrink:0}}>MWp</span>
                 </div>
-                <div style={{fontSize:8,color:"#666",marginBottom:4,paddingLeft:4}}>Ctrl+click for multiselection</div>
                 {PHASES.map(p=>{
                   const groupKey = p.id===0 ? null : p.id<=2?"sp":p.id<=4?"ms":"pv";
                   const isOpen = groupKey && colorPickerId===`phase_${groupKey}`;
@@ -885,18 +884,18 @@ export default function SolarPark() {
                   {subs.map(s => {
                     const mwp = (s.tables.length * 30 * 615 / 1e6).toFixed(2);
                     const isTarget = subAssignId === s.id;
-                    const isFiltered = subFilter === s.id;
+                    const isFiltered = subFilter.has(s.id);
                     const isColorOpen = colorPickerId === `sidebar_${s.id}`;
                     const SUB_PRESETS = ["#f87171","#fb923c","#fbbf24","#a3e635","#34d399","#22d3ee","#818cf8","#e879f9","#e53e3e","#2b6cb0","#276749","#dd6b20"];
                     const cMS=s.contractedMS||0, cPV=s.contractedPV||0;
                     const contracted = cMS||cPV ? Math.max(cMS,cPV) : (s.contracted||0);
                     return (
                       <div key={s.id}>
-                        <div onClick={()=>{ if(subAssignMode) setSubAssignId(id=>id===s.id?null:s.id); else setSubFilter(f=>f===s.id?null:s.id); }}
+                        <div onClick={e=>{ if(subAssignMode){setSubAssignId(id=>id===s.id?null:s.id);}else if(e.ctrlKey||e.metaKey){setSubFilter(prev=>{const ns=new Set(prev);ns.has(s.id)?ns.delete(s.id):ns.add(s.id);return ns;});}else{setSubFilter(prev=>prev.size===1&&prev.has(s.id)?new Set():new Set([s.id]));} }}
                           style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
                             background:isTarget?"#1e1a2e":isFiltered?"#1a1a2e":"transparent",
                             border:`1px solid ${isTarget?s.color+"cc":isFiltered?s.color+"55":"transparent"}`,
-                            opacity:!subAssignMode&&subFilter!==null&&!isFiltered?0.35:1}}>
+                            opacity:!subAssignMode&&subFilter.size>0&&!isFiltered?0.35:1}}>
                           <div onClick={e=>{e.stopPropagation(); setColorPickerId(isColorOpen?null:`sidebar_${s.id}`);}}
                             style={{width:18,height:8,borderRadius:2,flexShrink:0,cursor:"pointer",
                               background:"transparent",border:`2px solid ${s.color}`,
@@ -978,9 +977,9 @@ export default function SolarPark() {
                   const bt=TABLES.filter(t=>t.m===mv);
                   const mwp=(bt.length*30*615/1e6).toFixed(2);
                   return (
-                    <div key={mv} onClick={()=>setBf(bf===mv?null:mv)}
+                    <div key={mv} onClick={e=>{ if(e.ctrlKey||e.metaKey){setBf(prev=>{const s=new Set(prev);s.has(mv)?s.delete(mv):s.add(mv);return s;});}else{setBf(prev=>prev.size===1&&prev.has(mv)?new Set():new Set([mv]));} }}
                       style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
-                        background:bf===mv?"#1e1e35":"transparent",border:`1px solid ${bf===mv?"#2d2d4a":"transparent"}`}}>
+                        background:bf.has(mv)?"#1e1e35":"transparent",border:`1px solid ${bf.has(mv)?"#2d2d4a":"transparent"}`}}>
                       <div style={{width:18,height:8,borderRadius:2,background:BC[mv],flexShrink:0,border:`1px solid ${BC[mv]}88`}}/>
                       <span style={{flex:1,fontSize:9,color:"#ccc"}}>MVPS {mv}</span>
                       <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{bt.length}</span>
@@ -1000,7 +999,8 @@ export default function SolarPark() {
               🖱 Click = next phase<br/>
               🖱 Right-click = phase menu<br/>
               🔍 Scroll = zoom · ✋ Drag<br/>
-              ⬚ Shift+drag: area select
+              ⬚ Shift+drag: area select<br/>
+              🖱 Ctrl+click: multiselection
             </div>
           </div>
           <div ref={canvasRef} style={{flex:1,overflow:"hidden",position:"relative",cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"grab"):"default"}}>
@@ -1009,17 +1009,17 @@ export default function SolarPark() {
                 <rect x={-5} y={-5} width={CW+10} height={CH+10} fill="#0d0d14"/>
                 {showMvps && Object.entries(hulls.polygons).map(([mv,pts])=>(
                   <polygon key={`bg${mv}`} points={pts}
-                    fill={`${BC[+mv]}${bf===+mv?"22":"18"}`}
-                    stroke={`${BC[+mv]}${bf===+mv?"dd":"55"}`}
-                    strokeWidth={bf===+mv?0.5:0.3}/>
+                    fill={`${BC[+mv]}${bf.has(+mv)?"22":"18"}`}
+                    stroke={`${BC[+mv]}${bf.has(+mv)?"dd":"55"}`}
+                    strokeWidth={bf.has(+mv)?0.5:0.3}/>
                 ))}
                 {TABLES.map(t=>{
                   const ph=Math.min((phases[t.id]||0), PHASES.length-1), p=PHASES[ph];
                   const subCol = subColorMap[t.id];
-                  const phaseDim = showPhases && ((pf.size>0&&!pf.has(ph))||(bf!==null&&t.m!==bf));
+                  const phaseDim = showPhases && ((pf.size>0&&!pf.has(ph))||(bf.size>0&&!bf.has(t.m)));
                   const subDim = showSubs && (
-                    (subFilter !== null && !subs.find(s=>s.id===subFilter)?.tables.includes(t.id)) ||
-                    (bf !== null && t.m !== bf)
+                    (subFilter.size>0 && !subs.filter(s=>subFilter.has(s.id)).some(s=>s.tables.includes(t.id))) ||
+                    (bf.size>0 && !bf.has(t.m))
                   );
                   const dim = phaseDim || subDim;
                   const grp = ph<=2?"sp":ph<=4?"ms":"pv";
