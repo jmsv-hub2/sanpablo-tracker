@@ -66,14 +66,18 @@ async function loadFromSheets() {
     const phases = {};
     const subsMap = {};
     const pvMap = {};
+    const msMap = {};
     dataJson.data.forEach(row => {
       phases[row.id] = parseInt(row.phase) || 0;
       if (row.subcontractor_ms) {
         if (!subsMap[row.subcontractor_ms]) subsMap[row.subcontractor_ms] = [];
-        subsMap[row.subcontractor_ms].push(row.id);
+        if (!subsMap[row.subcontractor_ms].includes(row.id)) subsMap[row.subcontractor_ms].push(row.id);
+        msMap[row.id] = row.subcontractor_ms;
       }
-      if (row.subcontractor_pv && row.subcontractor_pv !== row.subcontractor_ms) {
-        pvMap[row.id] = row.subcontractor_pv;
+      if (row.subcontractor_pv) {
+        if (!subsMap[row.subcontractor_pv]) subsMap[row.subcontractor_pv] = [];
+        if (!subsMap[row.subcontractor_pv].includes(row.id)) subsMap[row.subcontractor_pv].push(row.id);
+        if (row.subcontractor_pv !== row.subcontractor_ms) pvMap[row.id] = row.subcontractor_pv;
       }
     });
     // Config: colors + full subs list (with contracted, color)
@@ -93,7 +97,7 @@ async function loadFromSheets() {
     } catch(e) {}
     // Build final subs: prefer config (preserves order/color/contracted) else sheets map
     const finalSubs = subsFromConfig || buildSubs(Object.entries(subsMap).map(([name, tables]) => ({id:name,name,tables})));
-    return { phases, subs: finalSubs, colors, subconPV: pvMap, source: "sheets" };
+    return { phases, subs: finalSubs, colors, subconPV: pvMap, subconMS: msMap, source: "sheets" };
   } catch(e) {
     return { phases: {...INITIAL_PHASES}, subs: INITIAL_SUBS.map((s,i)=>({...s,color:SUB_COLORS[i%SUB_COLORS.length]})), colors: null, subconPV: {}, source: "embedded" };
   }
@@ -290,6 +294,7 @@ export default function SolarPark() {
           color: s.color || colorMap[s.id] || s.color,
         })));
         if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
+        if(sheetsData.subconMS) setSubconMS(sheetsData.subconMS);
         setLoaded(true);
         if(sheetsData.source === "sheets") {
           setSyncStatus("ok");
@@ -1021,7 +1026,7 @@ export default function SolarPark() {
                   const strokeColor = (showSubs && subCol && !phaseDim) ? subCol+subOpacHex : PHASES[0].border;
                   const strokeW = (showSubs && subCol && !phaseDim) ? 0.8 : 0.15;
                   const opacity = 1;
-                  const hasDualSub = subconPV[t.id] && subconPV[t.id] !== getSubForTable(t.id);
+                  const hasDualSub = subconPV[t.id] && subconMS[t.id] && subconPV[t.id] !== subconMS[t.id];
                   const tx = t.x+ROX, ty = t.y+ROY;
                   return (
                     <g key={t.id}
