@@ -360,6 +360,12 @@ export default function SolarPark() {
     if(!phases) return Array(7).fill(0);
     const c = Array(7).fill(0); Object.values(phases).forEach(p => c[p]++); return c;
   }, [phases]);
+  // Cumulative: phase N = exact count of N + all phases after N (since later phases imply earlier ones were completed)
+  const statsCum = useMemo(() => {
+    const c = Array(7).fill(0);
+    for(let i=0;i<7;i++){ for(let j=i;j<7;j++){ c[i]+=stats[j]; } }
+    return c;
+  }, [stats]);
   const spPendingInsp = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) === 1).length, [phases]);
   const spDone        = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) >= 2).length, [phases]);
   const spExecuted    = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) >= 1).length, [phases]); 
@@ -820,8 +826,8 @@ export default function SolarPark() {
                           style={{width:22,height:8,borderRadius:2,background:p.color,border:`1px solid ${p.border}`,flexShrink:0,marginTop:1,cursor:groupKey?"pointer":"default",
                             outline:isOpen?"2px solid #fff":"none",outlineOffset:1}}/>
                         <span style={{flex:1,fontSize:9,color:"#bbb",lineHeight:1.35}}>{p.label}</span>
-                        <span style={{fontSize:9,color:"#555",width:24,textAlign:"right",flexShrink:0,marginTop:1}}>{stats[p.id]}</span>
-                        <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0,marginTop:2}}>{(stats[p.id]*30*615/1e6).toFixed(2)}</span>
+                        <span style={{fontSize:9,color:"#555",width:24,textAlign:"right",flexShrink:0,marginTop:1}}>{p.id===0?stats[0]:statsCum[p.id]}</span>
+                        <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0,marginTop:2}}>{((p.id===0?stats[0]:statsCum[p.id])*30*615/1e6).toFixed(2)}</span>
                       </div>
                       {isOpen && p.id % 2 === 1 && (
                         <div style={{padding:"6px 6px 7px",marginBottom:4,background:"#12121f",borderRadius:4,border:"1px solid #2d2d4a"}}>
