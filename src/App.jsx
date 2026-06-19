@@ -826,8 +826,8 @@ export default function SolarPark() {
                           style={{width:22,height:8,borderRadius:2,background:p.color,border:`1px solid ${p.border}`,flexShrink:0,marginTop:1,cursor:groupKey?"pointer":"default",
                             outline:isOpen?"2px solid #fff":"none",outlineOffset:1}}/>
                         <span style={{flex:1,fontSize:9,color:"#bbb",lineHeight:1.35}}>{p.label}</span>
-                        <span style={{fontSize:9,color:"#555",width:24,textAlign:"right",flexShrink:0,marginTop:1}}>{p.id===0?stats[0]:statsCum[p.id]}</span>
-                        <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0,marginTop:2}}>{((p.id===0?stats[0]:statsCum[p.id])*30*615/1e6).toFixed(2)}</span>
+                        <span style={{fontSize:9,color:"#555",width:24,textAlign:"right",flexShrink:0,marginTop:1}}>{[2,4,6].includes(p.id)?statsCum[p.id]:stats[p.id]}</span>
+                        <span style={{fontSize:8,color:"#666",width:32,textAlign:"right",flexShrink:0,marginTop:2}}>{(([2,4,6].includes(p.id)?statsCum[p.id]:stats[p.id])*30*615/1e6).toFixed(2)}</span>
                       </div>
                       {isOpen && p.id % 2 === 1 && (
                         <div style={{padding:"6px 6px 7px",marginBottom:4,background:"#12121f",borderRadius:4,border:"1px solid #2d2d4a"}}>
