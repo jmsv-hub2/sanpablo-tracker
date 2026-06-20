@@ -706,7 +706,10 @@ export default function SolarPark() {
               <div style={{fontSize:8,color:"#666"}}>{s.l} <span style={{color:"#555"}}>exe</span> <span style={{color:"#444"}}>/</span> <span style={{color:"#444"}}>appr</span></div>
             </div>
           ))}
-          <span style={{color:"#22c55e",fontWeight:700,fontSize:12,borderLeft:"1px solid #1e1e35",paddingLeft:10}}>{mwp} / {TOTAL_MWP.toFixed(2)} MWp</span>
+          <div style={{borderLeft:"1px solid #1e1e35",paddingLeft:10,textAlign:"center"}}>
+            <span style={{color:"#22c55e",fontWeight:700,fontSize:12}}>{mwp} / {TOTAL_MWP.toFixed(2)} MWp</span>
+            <div style={{fontSize:8,color:"#555",marginTop:1}}>(based on PV approved)</div>
+          </div>
           {!canEdit && (
             <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,background:"#1a1a0a",color:"#888",border:"1px solid #2d2d1a"}}>
               👁 View only
