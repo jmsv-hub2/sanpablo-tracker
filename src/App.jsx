@@ -1004,7 +1004,7 @@ export default function SolarPark() {
               title="Reset view and all layers to default">
               ↺ RESET VIEW
             </button>
-            <div style={{marginTop:4,padding:6,background:"#0d0d1a",borderRadius:4,border:"1px solid #1a1a2e",fontSize:8,color:"#666",lineHeight:1.9}}>
+            <div style={{marginTop:4,padding:6,background:"#0d0d1a",borderRadius:4,border:"1px solid #1a1a2e",fontSize:10,color:"#666",lineHeight:1.9}}>
               🖱 Click = next phase<br/>
               🖱 Right-click = phase menu<br/>
               🔍 Scroll = zoom · ✋ Drag<br/>
