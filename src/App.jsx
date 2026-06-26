@@ -277,17 +277,15 @@ export default function SolarPark() {
     setPhaseOpacity({sp:1, ms:1, pv:1});
     setTimeout(fitToScreen, 50);
   }, [fitToScreen]);
-  useEffect(() => {
+  const reloadFromSheets = useCallback(() => {
     setSyncStatus("loading");
     Promise.all([loadFromSheets(), Promise.resolve(loadLocalConfig())])
       .then(([sheetsData, localCfg]) => {
         setPhases(Object.fromEntries(
           Object.entries(sheetsData.phases).map(([k,v]) => [k, Math.min(v,6)])
         ));
-        // Colors: sheets config > localStorage > default
         const colorsToUse = sheetsData.colors || localCfg.colors;
         if(colorsToUse) setPhaseColors(colorsToUse);
-        // Subs: sheets config already has color+contracted merged
         const colorMap = {};
         (localCfg.subColors || []).forEach(s => { colorMap[s.id] = s.color; });
         setSubs(sheetsData.subs.map(s => ({
@@ -309,16 +307,16 @@ export default function SolarPark() {
           setTimeout(fitToScreen, 100);
         }
       })
-      .catch(err => {
-        // Even the embedded fallback failed somehow — use INITIAL_PHASES directly
+      .catch(() => {
         setPhases(Object.fromEntries(Object.entries(INITIAL_PHASES).map(([k,v])=>[k,Math.min(v,6)])));
         setSubs(INITIAL_SUBS);
         setLoaded(true);
         setSyncStatus("error");
         setSyncDate(new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));
-          setSyncMsg("Using embedded snapshot · deploy to Vercel for live sync");
+        setSyncMsg("Using embedded snapshot · deploy to Vercel for live sync");
       }).then(()=>{ setTimeout(fitToScreen,50); });
-  }, []);
+  }, [fitToScreen]);
+  useEffect(() => { reloadFromSheets(); }, []);
   useEffect(() => {
     if(loaded) saveLocalConfig(subs, phaseColors);
   }, [subs, phaseColors, loaded]);
@@ -715,12 +713,19 @@ export default function SolarPark() {
               👁 View only
             </div>
           )}
-          <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,
-            background: syncStatus==="ok"?"#0a1a0a": syncStatus==="saving"?"#0f0f1a": syncStatus==="error"?"#1a0a0a":"#0f0f1a",
-            color:       syncStatus==="ok"?"#22c55e": syncStatus==="saving"?"#818cf8": syncStatus==="error"?"#f87171":"#555",
-            border:`1px solid ${syncStatus==="ok"?"#22c55e33": syncStatus==="saving"?"#818cf833": syncStatus==="error"?"#f8717133":"#1e1e35"}`
-          }} title={syncMsg}>
-            {syncStatus==="loading"?"⏳ Loading…": syncStatus==="saving"?"💾 Saving…": syncStatus==="ok"?"✓ Synced": "⚠ Offline"}{syncDate && <span style={{fontSize:9,color:"#444",marginLeft:6}}>· Last update: {syncDate}</span>}
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,
+              background: syncStatus==="ok"?"#0a1a0a": syncStatus==="saving"?"#0f0f1a": syncStatus==="error"?"#1a0a0a":"#0f0f1a",
+              color:       syncStatus==="ok"?"#22c55e": syncStatus==="saving"?"#818cf8": syncStatus==="error"?"#f87171":"#555",
+              border:`1px solid ${syncStatus==="ok"?"#22c55e33": syncStatus==="saving"?"#818cf833": syncStatus==="error"?"#f8717133":"#1e1e35"}`
+            }} title={syncMsg}>
+              {syncStatus==="loading"?"⏳ Loading…": syncStatus==="saving"?"💾 Saving…": syncStatus==="ok"?"✓ Synced": "⚠ Offline"}{syncDate && <span style={{fontSize:9,color:"#444",marginLeft:6}}>· Last update: {syncDate}</span>}
+            </div>
+            <button onClick={reloadFromSheets} disabled={syncStatus==="loading"||syncStatus==="saving"}
+              title="Reload data from Google Sheets"
+              style={{background:"#0d0d1a",border:"1px solid #1e1e35",color:"#555",borderRadius:4,padding:"2px 6px",cursor:"pointer",fontSize:11,lineHeight:1}}>
+              ↺
+            </button>
           </div>
           <div style={{display:"flex",gap:1,background:"#0d0d14",borderRadius:5,padding:2,marginLeft:4}}>
             {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"]].map(([t,l])=>(
