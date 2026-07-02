@@ -1033,28 +1033,20 @@ export default function SolarPark() {
                 </button>
               </div>
               {!collapseScb && <>
-                {(() => {
-                  const wiredN = SCB_LIST.filter(s=>(scbStatus[s.id]||0)===2).length;
-                  const total = SCB_LIST.length;
-                  const pct = wiredN/total*100;
-                  return (
-                    <div style={{padding:"5px 4px 4px",marginBottom:2}}>
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#999",marginBottom:3}}>
-                        <span>{wiredN}/{total}</span><span style={{color:"#4ade80",fontWeight:700}}>{pct.toFixed(1)}%</span>
-                      </div>
-                      <div style={{height:4,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:pct+"%",background:"#4ade80",borderRadius:2,transition:"width .3s"}}/>
-                      </div>
-                    </div>
-                  );
-                })()}
                 {SCB_STATUS.map((st,si)=>{
                   const n = si===1 ? SCB_LIST.filter(s=>(scbStatus[s.id]||0)>=1).length : SCB_LIST.filter(s=>(scbStatus[s.id]||0)===si).length;
+                  const total = SCB_LIST.length;
+                  const pct = (n/total*100).toFixed(0);
                   return (
                     <div key={si} style={{display:"flex",alignItems:"center",gap:7,padding:"2px 4px",marginBottom:1}}>
-                      <div style={{width:22,height:8,borderRadius:2,background:st.color,flexShrink:0}}/>
+                      <div style={{width:9,height:9,borderRadius:2,background:st.color,flexShrink:0}}/>
                       <span style={{flex:1,fontSize:9,color:"#bbb"}}>{st.label}</span>
-                      <span style={{fontSize:9,color:"#666",width:24,textAlign:"right",flexShrink:0}}>{n}</span>
+                      {si===0 ? (
+                        <span style={{fontSize:9,color:"#888",flexShrink:0}}>{n}</span>
+                      ) : (<>
+                        <span style={{fontSize:8,color:"#555",marginRight:6,flexShrink:0}}>{pct}%</span>
+                        <span style={{fontSize:9,color:"#888",flexShrink:0}}>{n}/{total}</span>
+                      </>)}
                     </div>
                   );
                 })}
