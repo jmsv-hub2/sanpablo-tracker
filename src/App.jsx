@@ -190,6 +190,7 @@ export default function SolarPark() {
   const [showMvps, setShowMvps]           = useState(false);
   const [showScb, setShowScb]             = useState(false);
   const [collapseScb, setCollapseScb]     = useState(true);
+  const [collapseScbMvps, setCollapseScbMvps] = useState(true);
   const [scbStatus, setScbStatus]         = useState({});
   const [hoveredScb, setHoveredScb]       = useState(null);
   const [showLabels, setShowLabels]         = useState(false); 
@@ -1050,28 +1051,33 @@ export default function SolarPark() {
                     </div>
                   );
                 })}
-                <div style={{fontSize:9,color:"#666",margin:"3px 2px 4px"}}>🖱 Click SCB = next status · Hover = highlight tables</div>
                 <div style={{height:1,background:"#1e1e35",margin:"4px 0 6px"}}/>
-                <div style={{display:"flex",padding:"1px 4px",marginBottom:1}}>
-                  <div style={{width:23,flexShrink:0}}/>
-                  <span style={{flex:1}}/>
-                  <span style={{fontSize:8,color:"#333",width:36,textAlign:"right",flexShrink:0}}>done</span>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 4px",cursor:"pointer"}}
+                  onClick={()=>setCollapseScbMvps(s=>{ if(!s) setBf(new Set()); return !s; })}>
+                  <span style={{fontSize:9,color:"#888",fontWeight:600}}>Filter by MVPS {collapseScbMvps?"▸":"▾"}</span>
                 </div>
-                {[1,2,3,4,5,6,7,8,9,10,11].map(mv=>{
-                  const list = SCB_LIST.filter(s=>scbMvps(s.id)===mv);
-                  if (!list.length) return null;
-                  const done = list.filter(s=>(scbStatus[s.id]||0)===2).length;
-                  return (
-                    <div key={mv} onClick={e=>{ if(e.ctrlKey||e.metaKey){setBf(prev=>{const s=new Set(prev);s.has(mv)?s.delete(mv):s.add(mv);return s;});}else{setBf(prev=>prev.size===1&&prev.has(mv)?new Set():new Set([mv]));} }}
-                      style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
-                        background:bf.has(mv)?"#1e1e35":"transparent",border:`1px solid ${bf.has(mv)?"#2d2d4a":"transparent"}`}}>
-                      <div style={{width:18,height:8,borderRadius:2,background:BC[mv],flexShrink:0,border:`1px solid ${BC[mv]}88`}}/>
-                      <span style={{fontSize:9,color:"#ccc"}}>MVPS {mv}</span>
-                      <span style={{flex:1,fontSize:8,color:done===list.length?"#4ade80":"#555",textAlign:"left",paddingLeft:8}}>{(done/list.length*100).toFixed(0)}%</span>
-                      <span style={{fontSize:9,color:done===list.length?"#4ade80":"#666",width:36,textAlign:"right",flexShrink:0}}>{done}/{list.length}</span>
-                    </div>
-                  );
-                })}
+                {!collapseScbMvps && <div style={{paddingLeft:10}}>
+                  <div style={{display:"flex",padding:"1px 4px",marginBottom:1}}>
+                    <div style={{width:23,flexShrink:0}}/>
+                    <span style={{flex:1}}/>
+                    <span style={{fontSize:8,color:"#333",width:36,textAlign:"right",flexShrink:0}}>done</span>
+                  </div>
+                  {[1,2,3,4,5,6,7,8,9,10,11].map(mv=>{
+                    const list = SCB_LIST.filter(s=>scbMvps(s.id)===mv);
+                    if (!list.length) return null;
+                    const done = list.filter(s=>(scbStatus[s.id]||0)===2).length;
+                    return (
+                      <div key={mv} onClick={e=>{ if(e.ctrlKey||e.metaKey){setBf(prev=>{const s=new Set(prev);s.has(mv)?s.delete(mv):s.add(mv);return s;});}else{setBf(prev=>prev.size===1&&prev.has(mv)?new Set():new Set([mv]));} }}
+                        style={{display:"flex",alignItems:"center",gap:5,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
+                          background:bf.has(mv)?"#1e1e35":"transparent",border:`1px solid ${bf.has(mv)?"#2d2d4a":"transparent"}`}}>
+                        <div style={{width:18,height:8,borderRadius:2,background:BC[mv],flexShrink:0,border:`1px solid ${BC[mv]}88`}}/>
+                        <span style={{fontSize:9,color:"#ccc"}}>MVPS {mv}</span>
+                        <span style={{flex:1,fontSize:8,color:done===list.length?"#4ade80":"#555",textAlign:"left",paddingLeft:8}}>{(done/list.length*100).toFixed(0)}%</span>
+                        <span style={{fontSize:9,color:done===list.length?"#4ade80":"#666",width:36,textAlign:"right",flexShrink:0}}>{done}/{list.length}</span>
+                      </div>
+                    );
+                  })}
+                </div>}
               </>}
             </div>
             <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
