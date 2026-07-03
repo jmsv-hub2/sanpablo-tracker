@@ -90,10 +90,11 @@ async function loadFromSheets() {
       }
     });
     // Config: colors + full subs list (with contracted, color)
-    let colors = null, subsFromConfig = null, scbStatusFromConfig = {};
+    let colors = null, subsFromConfig = null, scbStatusFromConfig = {}, configOk = false;
     try {
       const cfgJson = await cfgRes.json();
       if (cfgJson.ok && cfgJson.config) {
+        configOk = true;
         colors = cfgJson.config.phaseColors || null;
         // Merge subsMap tables into config subs
         if (cfgJson.config.subs) {
@@ -105,11 +106,13 @@ async function loadFromSheets() {
         scbStatusFromConfig = cfgJson.config.scbStatus || {};
       }
     } catch(e) {}
-    // Build final subs: prefer config (preserves order/color/contracted) else sheets map
-    const finalSubs = subsFromConfig || buildSubs(Object.entries(subsMap).map(([name, tables]) => ({id:name,name,tables})));
-    return { phases, subs: finalSubs, colors, subconPV: pvMap, subconMS: msMap, scbStatus: scbStatusFromConfig, source: "sheets" };
+    // Build final subs: prefer config (preserves order/color/contracted) else sheets map.
+    // Only fall back to rebuilding subs from raw rows when config genuinely had none —
+    // never when the config fetch itself failed, or we'd wipe the real list on a blip.
+    const finalSubs = subsFromConfig || (configOk ? buildSubs(Object.entries(subsMap).map(([name, tables]) => ({id:name,name,tables}))) : null);
+    return { phases, subs: finalSubs, colors, subconPV: pvMap, subconMS: msMap, scbStatus: scbStatusFromConfig, configOk, source: "sheets" };
   } catch(e) {
-    return { phases: {...INITIAL_PHASES}, subs: INITIAL_SUBS.map((s,i)=>({...s,color:SUB_COLORS[i%SUB_COLORS.length]})), colors: null, subconPV: {}, subconMS: {}, scbStatus: {}, source: "embedded" };
+    return { phases: {...INITIAL_PHASES}, subs: null, colors: null, subconPV: {}, subconMS: {}, scbStatus: {}, configOk: false, source: "embedded" };
   }
 }
 async function pushToSheets(updates) {
@@ -242,7 +245,7 @@ export default function SolarPark() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [easterEgg]);
-  const pendingSync = useRef([]);   
+  const pendingSync = useRef([]);
   const syncTimer   = useRef(null);
   const isPainting  = useRef(false);
   const canvasRef   = useRef(null);
@@ -303,15 +306,23 @@ export default function SolarPark() {
         ));
         const colorsToUse = sheetsData.colors || localCfg.colors;
         if(colorsToUse) setPhaseColors(colorsToUse);
-        const colorMap = {};
-        (localCfg.subColors || []).forEach(s => { colorMap[s.id] = s.color; });
-        setSubs(sheetsData.subs.map(s => ({
-          ...s,
-          color: s.color || colorMap[s.id] || s.color,
-        })));
+        // Only trust subs/scbStatus from Sheets when the config fetch actually
+        // succeeded — a transient failure must never overwrite good local state
+        // with an empty default (this is what wiped subs + scbStatus before).
+        if (sheetsData.configOk) {
+          const colorMap = {};
+          (localCfg.subColors || []).forEach(s => { colorMap[s.id] = s.color; });
+          if (sheetsData.subs) {
+            setSubs(sheetsData.subs.map(s => ({
+              ...s,
+              color: s.color || colorMap[s.id] || s.color,
+            })));
+          }
+          setScbStatus(sheetsData.scbStatus || {});
+          configLoadedOk.current = true;
+        }
         if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
         if(sheetsData.subconMS) setSubconMS(sheetsData.subconMS);
-        setScbStatus(sheetsData.scbStatus || {});
         setLoaded(true);
         if(sheetsData.source === "sheets") {
           setSyncStatus("ok");
@@ -326,8 +337,10 @@ export default function SolarPark() {
         }
       })
       .catch(() => {
+        // Total fetch failure: fall back to the embedded phase snapshot for display,
+        // but never touch subs/scbStatus — leave whatever was already loaded intact
+        // rather than clobbering it with defaults.
         setPhases(Object.fromEntries(Object.entries(INITIAL_PHASES).map(([k,v])=>[k,Math.min(v,6)])));
-        setSubs(INITIAL_SUBS);
         setLoaded(true);
         setSyncStatus("error");
         setSyncDate(new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));
@@ -338,10 +351,14 @@ export default function SolarPark() {
   useEffect(() => {
     if(loaded) saveLocalConfig(subs, phaseColors);
   }, [subs, phaseColors, loaded]);
-  // Persist colors + subs + SCB status config to Sheets (debounced 2s)
+  // Persist colors + subs + SCB status config to Sheets (debounced 2s).
+  // Gated on configLoadedOk: only push once we've confirmed a real config
+  // load from Sheets succeeded, so a fetch blip on startup can never write
+  // an empty subs/scbStatus over real data.
   const configTimer = useRef(null);
+  const configLoadedOk = useRef(false);
   useEffect(() => {
-    if(!loaded || !canEdit) return;
+    if(!loaded || !canEdit || !configLoadedOk.current) return;
     if(configTimer.current) clearTimeout(configTimer.current);
     configTimer.current = setTimeout(() => {
       pushConfig({
