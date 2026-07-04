@@ -124,12 +124,18 @@ async function loadFromSheets() {
     return { phases: {...INITIAL_PHASES}, subs: null, colors: null, subconPV: {}, subconMS: {}, scbStatus: {}, configOk: false, source: "embedded" };
   }
 }
+// Dev builds (local `npm run dev`) point at the exact same Google Sheet as
+// production — there is no separate sandbox. Never let a local test session
+// write to it: reads still hit the real Sheet (harmless), but every write
+// path below is a no-op in dev, logged to the console instead.
+const IS_DEV = import.meta.env.DEV;
 async function pushToSheets(updates) {
+  if (IS_DEV) { console.warn("[DEV] pushToSheets blocked — would have written:", updates); return updates; }
   const now = new Date().toISOString().slice(0,10);
   const payload = updates.map(u => ({ ...u, last_updated: now, subcontractor_pv: u.subcontractor_pv ?? undefined }));
   const res = await fetch(API_URL, {
     method: "POST",
-    headers: { "Content-Type": "text/plain" }, 
+    headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({ token: EDIT_TOKEN, updates: payload }),
   });
   const json = await res.json();
@@ -137,6 +143,7 @@ async function pushToSheets(updates) {
   return json.data;
 }
 async function pushConfig(config) {
+  if (IS_DEV) { console.warn("[DEV] pushConfig blocked — would have written:", config); return true; }
   try {
     const res = await fetch(API_URL, {
       method: "POST",
@@ -759,6 +766,12 @@ export default function SolarPark() {
             <span style={{color:"#22c55e",fontWeight:700,fontSize:12}}>{mwp} / {TOTAL_MWP.toFixed(2)} MWp</span>
             <div style={{fontSize:8,color:"#555",marginTop:1}}>(based on PV approved)</div>
           </div>
+          {IS_DEV && (
+            <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:700,background:"#2a0a0a",color:"#f87171",border:"1px solid #f8717155"}}
+              title="Local dev build: reads real Sheet data, but all writes (phases, subs, SCB status, config) are blocked and only logged to console.">
+              🧪 DEV MODE — changes not saved
+            </div>
+          )}
           {!canEdit && (
             <div style={{fontSize:9,padding:"2px 8px",borderRadius:4,fontWeight:600,background:"#1a1a0a",color:"#888",border:"1px solid #2d2d1a"}}>
               👁 View only
