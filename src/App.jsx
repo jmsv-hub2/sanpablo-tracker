@@ -45,11 +45,20 @@ function buildTables() {
 }
 const SCB_LIST=[{id:"1A-01",x:185,y:190.5},{id:"1A-02",x:220,y:211},{id:"1A-03",x:220,y:231},{id:"1A-04",x:220,y:244.5},{id:"1A-05",x:220,y:265},{id:"1B-06",x:220,y:278.5},{id:"1B-07",x:220,y:292},{id:"1B-08",x:107,y:295.5},{id:"1B-09",x:107,y:315.5},{id:"1B-10",x:107,y:329},{id:"1C-11",x:107,y:356.5},{id:"1C-12",x:181.5,y:309},{id:"1C-13",x:181.5,y:336},{id:"1C-14",x:181.5,y:362.5},{id:"1C-15",x:181.5,y:396.5},{id:"1D-16",x:199,y:403},{id:"1D-17",x:199,y:376},{id:"1D-18",x:199,y:349},{id:"1D-19",x:199,y:329},{id:"2A-01",x:448.5,y:345},{id:"2A-02",x:448.5,y:338},{id:"2A-03",x:448.5,y:324.5},{id:"2A-04",x:448.5,y:318},{id:"2B-05",x:393,y:298.5},{id:"2B-06",x:359.5,y:329},{id:"2B-07",x:359.5,y:349.5},{id:"2B-08",x:359.5,y:369.5},{id:"2C-09",x:359.5,y:390},{id:"2C-10",x:359.5,y:417},{id:"2C-11",x:439,y:336},{id:"2C-12",x:439,y:356},{id:"2D-13",x:439,y:376.5},{id:"2D-14",x:439,y:396.5},{id:"2D-15",x:438.5,y:423.5},{id:"2D-16",x:448.5,y:489.5},{id:"2E-17",x:448.5,y:469},{id:"2E-18",x:448.5,y:455.5},{id:"2E-19",x:448.5,y:435.5},{id:"2E-20",x:448.5,y:422},{id:"2F-21",x:448.5,y:402},{id:"2F-22",x:448.5,y:388.5},{id:"2F-23",x:448.5,y:381.5},{id:"2F-24",x:557.5,y:368},{id:"2G-25",x:557.5,y:381.5},{id:"2G-26",x:557.5,y:408.5},{id:"2G-27",x:557.5,y:422},{id:"2G-28",x:557.5,y:435.5},{id:"2H-29",x:557.5,y:455.5},{id:"2H-30",x:557.5,y:469},{id:"2H-31",x:557.5,y:482.5},{id:"2H-32",x:557.5,y:496},{id:"3A-01",x:438.5,y:464},{id:"3A-02",x:438.5,y:497.5},{id:"3A-03",x:452,y:518},{id:"3A-04",x:452,y:538},{id:"3B-05",x:452,y:545},{id:"3B-06",x:452,y:578.5},{id:"3B-07",x:452,y:599},{id:"3B-08",x:452,y:625.5},{id:"3C-09",x:465.5,y:522},{id:"3C-10",x:465.5,y:535.5},{id:"3C-11",x:465.5,y:549},{id:"3C-12",x:465.5,y:569.5},{id:"3D-13",x:465.5,y:583},{id:"3D-14",x:465.5,y:596.5},{id:"3D-15",x:465.5,y:616.5},{id:"3D-16",x:465.5,y:630},{id:"4A-01",x:452,y:652.5},{id:"4A-02",x:452,y:666},{id:"4A-03",x:452,y:686.5},{id:"4A-04",x:452,y:713.5},{id:"4B-05",x:452,y:733.5},{id:"4B-06",x:452,y:760.5},{id:"4B-07",x:452,y:781},{id:"4B-08",x:434.5,y:808},{id:"4C-09",x:434.5,y:828},{id:"4C-10",x:434.5,y:855},{id:"4C-11",x:455.5,y:785},{id:"4C-12",x:455.5,y:771.5},{id:"4D-13",x:455.5,y:751.5},{id:"4D-14",x:455.5,y:724.5},{id:"4D-15",x:455.5,y:697.5},{id:"4D-16",x:455.5,y:670.5},{id:"5A-01",x:576.5,y:522},{id:"5A-02",x:576.5,y:542.5},{id:"5A-03",x:576.5,y:562.5},{id:"5B-04",x:576.5,y:583},{id:"5B-05",x:576.5,y:610},{id:"5B-06",x:576.5,y:616.5},{id:"5C-07",x:598.5,y:670.5},{id:"5C-08",x:598.5,y:684},{id:"5C-09",x:598.5,y:711},{id:"5D-10",x:598.5,y:731},{id:"5D-11",x:598.5,y:744.5},{id:"5D-12",x:602,y:691},{id:"5D-13",x:602,y:664},{id:"5E-14",x:701,y:657},{id:"5E-15",x:736,y:684},{id:"5E-16",x:736,y:697.5},{id:"5F-17",x:843.5,y:717.5},{id:"5F-18",x:843.5,y:738},{id:"5F-19",x:843.5,y:758},{id:"5F-20",x:843.5,y:792},{id:"5G-21",x:846,y:704.5},{id:"5G-22",x:846,y:731},{id:"5G-23",x:846,y:751.5},{id:"5H-24",x:846,y:765},{id:"5H-25",x:846,y:778.5},{id:"5H-26",x:846,y:798.5},{id:"6A-01",x:834,y:454.5},{id:"6A-02",x:834,y:441},{id:"6A-03",x:834,y:414},{id:"6A-04",x:834,y:400.5},{id:"6A-05",x:834,y:380.5},{id:"6B-06",x:834,y:360.5},{id:"6B-07",x:834,y:340},{id:"6B-08",x:834,y:326.5},{id:"6B-09",x:834,y:293},{id:"6C-10",x:829.5,y:299.5},{id:"6C-11",x:829.5,y:320},{id:"6C-12",x:829.5,y:347},{id:"6C-13",x:829.5,y:353.5},{id:"6C-14",x:829.5,y:367},{id:"6D-15",x:829.5,y:387.5},{id:"6D-16",x:829.5,y:407.5},{id:"6D-17",x:829.5,y:421},{id:"6D-18",x:829.5,y:434.5},{id:"6D-19",x:829.5,y:448},{id:"7A-01",x:1153.5,y:338},{id:"7A-02",x:1153.5,y:358},{id:"7A-03",x:1153.5,y:371.5},{id:"7A-04",x:1246,y:365},{id:"7B-05",x:1048,y:297},{id:"7B-06",x:1142,y:336.5},{id:"7B-07",x:1142,y:370},{id:"7B-08",x:1142,y:390.5},{id:"7C-09",x:1142,y:410.5},{id:"7C-10",x:1142,y:417.5},{id:"7C-11",x:1142,y:451},{id:"7C-12",x:1142,y:464.5},{id:"7D-13",x:1142,y:478},{id:"7D-14",x:1142,y:491.5},{id:"7D-15",x:1142,y:511.5},{id:"7D-16",x:1142,y:525},{id:"7E-17",x:1153.5,y:511.5},{id:"7E-18",x:1153.5,y:491.5},{id:"7E-19",x:1153.5,y:478},{id:"7E-20",x:1153.5,y:458},{id:"7E-21",x:1153.5,y:437.5},{id:"7F-22",x:1153.5,y:424},{id:"7F-23",x:1153.5,y:410.5},{id:"7F-24",x:1261.5,y:525},{id:"7F-25",x:1261.5,y:505},{id:"7G-26",x:1261.5,y:491.5},{id:"7G-27",x:1261.5,y:478},{id:"7G-28",x:1261.5,y:464.5},{id:"7G-29",x:1261.5,y:451},{id:"7G-30",x:1261.5,y:437.5},{id:"7H-31",x:1261.5,y:424},{id:"7H-32",x:1261.5,y:410.5},{id:"7H-33",x:1261.5,y:397},{id:"7H-34",x:1406.5,y:424.5},{id:"7H-35",x:1406.5,y:444.5},{id:"8A-01",x:1261.5,y:606},{id:"8A-02",x:1261.5,y:586},{id:"8A-03",x:1261.5,y:565.5},{id:"8A-04",x:1261.5,y:545.5},{id:"8B-05",x:1153.5,y:599.5},{id:"8B-06",x:1153.5,y:586},{id:"8B-07",x:1153.5,y:565.5},{id:"8B-08",x:1153.5,y:552},{id:"8B-09",x:1153.5,y:532},{id:"8C-10",x:1261.5,y:640},{id:"8C-11",x:1261.5,y:660},{id:"8C-12",x:1261.5,y:680.5},{id:"8C-13",x:1261.5,y:700.5},{id:"8D-14",x:1261.5,y:721},{id:"8D-15",x:1261.5,y:734.5},{id:"8D-16",x:1153.5,y:640},{id:"8D-17",x:1153.5,y:653.5},{id:"8E-18",x:1153.5,y:667},{id:"8E-19",x:1153.5,y:687},{id:"8E-20",x:1153.5,y:700.5},{id:"8E-21",x:1153.5,y:727.5},{id:"8F-22",x:1153.5,y:734.5},{id:"8F-23",x:1153.5,y:748},{id:"8F-24",x:1142,y:754.5},{id:"8F-25",x:1142,y:734},{id:"8G-26",x:1142,y:714},{id:"8G-27",x:1142,y:687},{id:"8G-28",x:1142,y:660},{id:"8G-29",x:1142,y:640},{id:"8G-30",x:1142,y:626.5},{id:"8H-31",x:1142,y:606},{id:"8H-32",x:1142,y:592.5},{id:"8H-33",x:1142,y:572.5},{id:"8H-34",x:1142,y:559},{id:"8H-35",x:1142,y:545.5},{id:"9A-01",x:1584.5,y:640},{id:"9A-02",x:1584.5,y:660.5},{id:"9A-03",x:1584.5,y:680.5},{id:"9A-04",x:1584.5,y:700.5},{id:"9B-05",x:1586.5,y:694},{id:"9B-06",x:1586.5,y:667},{id:"9B-07",x:1586.5,y:647},{id:"9B-08",x:1586.5,y:626.5},{id:"9C-09",x:1586.5,y:613},{id:"9C-10",x:1586.5,y:586},{id:"9C-11",x:1586.5,y:559},{id:"9C-12",x:1586.5,y:532},{id:"9D-13",x:1584.5,y:539},{id:"9D-14",x:1584.5,y:552.5},{id:"9D-15",x:1584.5,y:579.5},{id:"9D-16",x:1584.5,y:593},{id:"9D-17",x:1584.5,y:606.5},{id:"9E-18",x:1406.5,y:606.5},{id:"9E-19",x:1406.5,y:586},{id:"9E-20",x:1406.5,y:572.5},{id:"9E-21",x:1406.5,y:545.5},{id:"9F-22",x:1406.5,y:525.5},{id:"9F-23",x:1406.5,y:512},{id:"9F-24",x:1406.5,y:492},{id:"9F-25",x:1406.5,y:465},{id:"9F-26",x:1404,y:532},{id:"9G-27",x:1404,y:566},{id:"9G-28",x:1404,y:599.5},{id:"9G-29",x:1404,y:647},{id:"9G-30",x:1404,y:680.5},{id:"9G-31",x:1404,y:721},{id:"9H-32",x:1406.5,y:714},{id:"9H-33",x:1406.5,y:694},{id:"9H-34",x:1406.5,y:673.5},{id:"9H-35",x:1406.5,y:660.5},{id:"9H-36",x:1406.5,y:640}];
 function scbMvps(id) { const m = id.match(/(\d+)/); return m ? +m[1] : null; }
+// value = what's actually stored per SCB id (unchanged from before for 0/1/2, so
+// existing data keeps its original meaning); countMode controls how the legend
+// tallies that row without touching the pre-existing count formulas.
 const SCB_STATUS = [
-  { label: "Not started", color: "#ef4444" },
-  { label: "SCB installed", color: "#f5c518" },
-  { label: "Fully wired", color: "#4ade80" },
+  { label: "Not started",           value: 0, color: "#ffffff", outline: true, countMode: "exact" },
+  { label: "SCB pending inspection",value: 1, color: "#ef4444", countMode: "exact" },
+  { label: "SCB approved",          value: 3, color: "#f5c518", countMode: "cumulative-approved" },
+  { label: "Fully wired",           value: 2, color: "#4ade80", countMode: "exact" },
 ];
+function scbStatusEntry(v) { return SCB_STATUS.find(s => s.value === (v||0)) || SCB_STATUS[0]; }
+function nextScbStatus(v) {
+  const idx = SCB_STATUS.findIndex(s => s.value === (v||0));
+  return SCB_STATUS[(idx + 1) % SCB_STATUS.length].value;
+}
 const INITIAL_PHASES = {};
 const INITIAL_SUBS = [];
 const API_URL = "https://script.google.com/macros/s/AKfycbwJQNUg5oRFeUABFEf_QfPGFa9XJBekbZs2gtreickGGCXxP-74UC_tvtPiX8x60DqGUg/exec";
@@ -162,6 +171,11 @@ export default function SolarPark() {
     } catch(e) { return true; }
   }, []);
   const TABLES = useMemo(() => buildTables(), []);
+  const scbStringCount = useMemo(() => {
+    const m = {};
+    TABLES.forEach(t => { if (t.scb) m[t.scb] = (m[t.scb]||0) + 1; });
+    return m;
+  }, [TABLES]);
   const [phases, setPhases] = useState(null);
   const [subs, setSubs]     = useState([]);
   const [phaseColors, setPhaseColors] = useState(DEFAULT_COLORS);
@@ -196,6 +210,7 @@ export default function SolarPark() {
   const [collapseScbMvps, setCollapseScbMvps] = useState(true);
   const [scbStatus, setScbStatus]         = useState({});
   const [hoveredScb, setHoveredScb]       = useState(null);
+  const [scbTooltip, setScbTooltip]       = useState(null);
   const [showLabels, setShowLabels]         = useState(false); 
   const [colorPickerId, setColorPickerId] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -1052,19 +1067,19 @@ export default function SolarPark() {
               </div>
               {!collapseScb && <>
                 {SCB_STATUS.map((st,si)=>{
-                  const n = si===1 ? SCB_LIST.filter(s=>(scbStatus[s.id]||0)>=1).length : SCB_LIST.filter(s=>(scbStatus[s.id]||0)===si).length;
+                  const n = st.countMode==="cumulative" ? SCB_LIST.filter(s=>(scbStatus[s.id]||0)>=1).length
+                    : st.countMode==="cumulative-approved" ? SCB_LIST.filter(s=>{const v=scbStatus[s.id]||0; return v===3||v===2;}).length
+                    : SCB_LIST.filter(s=>(scbStatus[s.id]||0)===st.value).length;
                   const total = SCB_LIST.length;
                   const pct = (n/total*100).toFixed(0);
                   return (
                     <div key={si} style={{display:"flex",alignItems:"center",gap:7,padding:"2px 4px",marginBottom:1}}>
-                      <div style={{width:9,height:9,borderRadius:2,background:st.color,flexShrink:0}}/>
+                      <div style={{width:9,height:9,borderRadius:2,flexShrink:0,
+                        background:st.outline?"transparent":st.color,
+                        border:st.outline?`1px solid ${st.color}`:"none"}}/>
                       <span style={{flex:1,fontSize:9,color:"#bbb"}}>{st.label}</span>
-                      {si===0 ? (
-                        <span style={{fontSize:9,color:"#888",flexShrink:0}}>{n}</span>
-                      ) : (<>
-                        <span style={{fontSize:8,color:"#555",marginRight:6,flexShrink:0}}>{pct}%</span>
-                        <span style={{fontSize:9,color:"#888",flexShrink:0}}>{n}/{total}</span>
-                      </>)}
+                      <span style={{fontSize:8,color:"#555",width:30,textAlign:"right",flexShrink:0}}>{pct}%</span>
+                      <span style={{fontSize:9,color:"#888",width:40,textAlign:"right",flexShrink:0}}>{n}/{total}</span>
                     </div>
                   );
                 })}
@@ -1123,18 +1138,20 @@ export default function SolarPark() {
                 ))}
                 {showScb && SCB_LIST.map(s=>{
                   const status = scbStatus[s.id]||0;
-                  const col = SCB_STATUS[status].color;
+                  const entry = scbStatusEntry(status);
+                  const col = entry.color;
                   const dim = bf.size>0 && !bf.has(scbMvps(s.id));
                   const hovered = hoveredScb===s.id;
                   return (
                     <rect key={`scb-${s.id}`} x={s.x-1} y={s.y-1} width={2} height={2} rx={0.3}
-                      fill={col} fillOpacity={dim?0.2:0.75}
+                      fill={entry.outline?"transparent":col} fillOpacity={entry.outline?0:(dim?0.2:0.75)}
                       stroke={hovered?"#fff":col} strokeWidth={hovered?0.5:0.35}
                       strokeOpacity={dim?0.2:1}
                       style={{cursor:"pointer"}}
-                      onMouseEnter={()=>setHoveredScb(s.id)}
-                      onMouseLeave={()=>setHoveredScb(null)}
-                      onClick={e=>{ e.stopPropagation(); if(!canEdit){showToast();return;} setScbStatus(prev=>({ ...prev, [s.id]: ((prev[s.id]||0)+1)%SCB_STATUS.length })); }}/>
+                      onMouseEnter={e=>{ setHoveredScb(s.id); setScbTooltip({id:s.id, mv:scbMvps(s.id), strings:scbStringCount[s.id]||0, x:e.clientX, y:e.clientY}); }}
+                      onMouseMove={e=>setScbTooltip(t=>t?{...t, x:e.clientX, y:e.clientY}:t)}
+                      onMouseLeave={()=>{ setHoveredScb(null); setScbTooltip(null); }}
+                      onClick={e=>{ e.stopPropagation(); if(!canEdit){showToast();return;} setScbStatus(prev=>({ ...prev, [s.id]: nextScbStatus(prev[s.id]||0) })); }}/>
                   );
                 })}
                 {TABLES.map(t=>{
@@ -1229,6 +1246,13 @@ export default function SolarPark() {
                 }}>MVPS {mv}</div>
               );
             })}
+            {scbTooltip && !paintMode && !subAssignMode && (
+              <div style={{position:"fixed",left:scbTooltip.x+12,top:scbTooltip.y+18,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100,boxShadow:"0 4px 16px rgba(0,0,0,.7)"}}>
+                <div style={{fontWeight:700,color:"#fff"}}>{scbTooltip.id}</div>
+                <div style={{color:"#aaa",marginTop:1}}>MVPS {scbTooltip.mv}</div>
+                <div style={{color:"#666",fontSize:10,marginTop:1}}>{scbTooltip.strings} string{scbTooltip.strings===1?"":"s"}</div>
+              </div>
+            )}
             {tooltip && !paintMode && !subAssignMode && (
               <div style={{position:"fixed",left:tooltip.x+12,top:tooltip.y+18,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:5,padding:"5px 9px",fontSize:11,pointerEvents:"none",zIndex:100,boxShadow:"0 4px 16px rgba(0,0,0,.7)"}}>
                 <div style={{fontWeight:700,color:"#fff"}}>{tooltip.id}</div>
