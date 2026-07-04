@@ -1148,7 +1148,7 @@ export default function SolarPark() {
                       stroke={hovered?"#fff":col} strokeWidth={hovered?0.5:0.35}
                       strokeOpacity={dim?0.2:1}
                       style={{cursor:"pointer"}}
-                      onMouseEnter={e=>{ setHoveredScb(s.id); setScbTooltip({id:s.id, mv:scbMvps(s.id), strings:scbStringCount[s.id]||0, x:e.clientX, y:e.clientY}); }}
+                      onMouseEnter={e=>{ setHoveredScb(s.id); setScbTooltip({id:s.id, mv:scbMvps(s.id), strings:scbStringCount[s.id]||0, status:entry, x:e.clientX, y:e.clientY}); }}
                       onMouseMove={e=>setScbTooltip(t=>t?{...t, x:e.clientX, y:e.clientY}:t)}
                       onMouseLeave={()=>{ setHoveredScb(null); setScbTooltip(null); }}
                       onClick={e=>{ e.stopPropagation(); if(!canEdit){showToast();return;} setScbStatus(prev=>({ ...prev, [s.id]: nextScbStatus(prev[s.id]||0) })); }}/>
@@ -1251,6 +1251,7 @@ export default function SolarPark() {
                 <div style={{fontWeight:700,color:"#fff"}}>{scbTooltip.id}</div>
                 <div style={{color:"#aaa",marginTop:1}}>MVPS {scbTooltip.mv}</div>
                 <div style={{color:"#666",fontSize:10,marginTop:1}}>{scbTooltip.strings} string{scbTooltip.strings===1?"":"s"}</div>
+                <div style={{color:scbTooltip.status.color,fontSize:9,marginTop:2}}>⚑ {scbTooltip.status.label}</div>
               </div>
             )}
             {tooltip && !paintMode && !subAssignMode && (
