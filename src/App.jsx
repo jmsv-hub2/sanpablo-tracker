@@ -1921,6 +1921,42 @@ export default function SolarPark() {
                       </tbody>
                     </table>
                   </div>
+                  {(()=>{
+                    let tMs=0,tPv=0,msDeficit=0,pvDeficit=0;
+                    [1,2,3,4,5,6,7,8,9].forEach(mv=>{
+                      const bt=TABLES.filter(t=>t.m===mv); const n=bt.length;
+                      const msDoneN=bt.filter(t=>(phases[t.id]||0)>=3).length;
+                      const pvDoneN=bt.filter(t=>(phases[t.id]||0)>=5).length;
+                      const pct=vreThresholds[mv]??100; const target=Math.ceil(n*pct/100);
+                      tMs+=msDoneN; tPv+=pvDoneN;
+                      msDeficit+=Math.max(0,target-msDoneN);
+                      pvDeficit+=Math.max(0,target-pvDoneN);
+                    });
+                    // Park-wide 80% floor: PV must reach MILESTONE_TABLES, MS must reach ceil(T*0.8).
+                    // Extra beyond the per-MVPS minimums needed to hit the global 80% target.
+                    const pvGlobalExtra = Math.max(0, MILESTONE_TABLES - (tPv + pvDeficit));
+                    const msGlobalExtra = Math.max(0, Math.ceil(T*0.8) - (tMs + msDeficit));
+                    const msTotal = msDeficit + msGlobalExtra;
+                    const pvTotal = pvDeficit + pvGlobalExtra;
+                    const Cell = ({icon,label,total,deficit,extra,color}) => (
+                      <div>
+                        <div style={{fontSize:10,color:"#666",marginBottom:2}}>{icon} {label}</div>
+                        <div style={{fontSize:22,fontWeight:700,color,lineHeight:1.1}}>{total.toLocaleString()} <span style={{fontSize:11,color:"#555",fontWeight:400}}>tables</span></div>
+                        <div style={{fontSize:10,color:"#555"}}>{deficit.toLocaleString()} MVPS mins{extra>0?` + ${extra.toLocaleString()} for park 80%`:""} · {(total*mwpPerTable).toFixed(2)} MWp</div>
+                      </div>
+                    );
+                    return (
+                      <div style={{marginTop:12,background:"#0d0d1a",border:"1px solid #22d3ee33",borderRadius:6,padding:"10px 14px"}}>
+                        <div style={{fontSize:9,color:"#22d3ee",fontWeight:700,letterSpacing:0.5,marginBottom:8}}>
+                          TO REACH 80% OF PARK ({MILESTONE_MWP} MWp · {MILESTONE_TABLES.toLocaleString()} tables) + ALL MVPS MINIMUMS
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                          <Cell icon="🏗" label="MS remaining" total={msTotal} deficit={msDeficit} extra={msGlobalExtra} color={phaseColors.ms}/>
+                          <Cell icon="🔆" label="PV remaining" total={pvTotal} deficit={pvDeficit} extra={pvGlobalExtra} color={phaseColors.pv}/>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setVreThresholds({...VRE_DEFAULTS})}
                       style={{background:"#0d0d1a",border:"1px solid #1e1e35",color:"#aaa",borderRadius:5,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:600}}>Reset to min. VRE</button>
