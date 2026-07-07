@@ -170,6 +170,19 @@ function loadLocalConfig() {
     };
   } catch(e) { return { subColors: null, colors: null }; }
 }
+// ── VRE threshold calculator (Metrics tab) ──────────────────────────────────
+// Per-MVPS minimum VRE-test thresholds (from the MSPV simulator). Editable in the
+// UI; defaults to 100% on load. Persisted only in localStorage — never touches Sheets.
+const VRE_DEFAULTS = { 1:73, 2:90, 3:90, 4:85, 5:55, 6:72, 7:80, 8:82, 9:80 };
+const VRE_LS_KEY = "sp_vre_thresholds";
+function loadVreThresholds() {
+  const base = {}; for(let z=1;z<=9;z++) base[z]=100;
+  try {
+    const raw = localStorage.getItem(VRE_LS_KEY);
+    if (raw) { const o = JSON.parse(raw); for(let z=1;z<=9;z++) if(typeof o[z]==="number") base[z]=o[z]; }
+  } catch(e) {}
+  return base;
+}
 export default function SolarPark() {
   const canEdit = useMemo(() => {
     try {
@@ -186,6 +199,8 @@ export default function SolarPark() {
   const [phases, setPhases] = useState(null);
   const [subs, setSubs]     = useState([]);
   const [phaseColors, setPhaseColors] = useState(DEFAULT_COLORS);
+  const [vreThresholds, setVreThresholds] = useState(loadVreThresholds);
+  useEffect(() => { try { localStorage.setItem(VRE_LS_KEY, JSON.stringify(vreThresholds)); } catch(e) {} }, [vreThresholds]);
   const PHASES = useMemo(() => makePhases(phaseColors), [phaseColors]);
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab]       = useState("map");
@@ -1825,6 +1840,92 @@ export default function SolarPark() {
                         </tr>
                       </tbody>
                     </table>
+                  </div>
+                </Card>
+              </div>
+              <div style={{marginTop:12}}>
+                <Card title="🎯 VRE THRESHOLD BY MVPS  ·  tables to reach target" accent="#22d3ee">
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                      <thead>
+                        <tr style={{color:"#555",fontSize:8,borderBottom:"1px solid #2d2d4a"}}>
+                          <th style={{textAlign:"left",padding:"3px 8px",fontWeight:600}}>MVPS</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600,borderLeft:"1px solid #1e2030"}}>Tables</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600,color:"#22d3ee"}}>VRE %</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600}}>Target</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600,color:phaseColors.ms,borderLeft:"1px solid #1e2030"}}>MS done/target</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600,color:phaseColors.pv}}>PV done/target</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600}}>Complete</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600,color:phaseColors.ms,borderLeft:"1px solid #1e2030"}}>Rem. MS</th>
+                          <th style={{textAlign:"center",padding:"3px 8px",fontWeight:600,color:phaseColors.pv}}>Rem. PV</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[1,2,3,4,5,6,7,8,9].map(mv=>{
+                          const bt = TABLES.filter(t=>t.m===mv);
+                          const n  = bt.length;
+                          const msDoneN   = bt.filter(t=>(phases[t.id]||0)>=3).length; // MS mounted (incl. pending inspection) — PV can be installed on it
+                          const pvDoneN   = bt.filter(t=>(phases[t.id]||0)>=5).length;
+                          const pct       = vreThresholds[mv] ?? 100;
+                          const target    = Math.ceil(n * pct / 100);
+                          const complete  = target>0 ? Math.min(100, pvDoneN/target*100) : 100;
+                          const remMs     = Math.max(0, target - msDoneN);
+                          const remPv     = Math.max(0, target - pvDoneN);
+                          const msMet     = msDoneN >= target;
+                          const pvMet     = pvDoneN >= target;
+                          const SEP = "1px solid #1e2030";
+                          return (
+                            <tr key={mv} style={{borderTop:"1px solid #1a1a2e"}}>
+                              <td style={{padding:"4px 8px",color:BC[mv],fontWeight:700,whiteSpace:"nowrap"}}>MVPS {mv}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:"#888",borderLeft:SEP}}>{n}</td>
+                              <td style={{padding:"3px 8px",textAlign:"center"}}>
+                                <input type="number" min={0} max={100} value={pct}
+                                  onChange={e=>{ const v=Math.max(0,Math.min(100,parseFloat(e.target.value)||0)); setVreThresholds(prev=>({...prev,[mv]:v})); }}
+                                  style={{width:46,background:"#0d0d1a",border:"1px solid #1e1e35",color:"#22d3ee",borderRadius:4,padding:"2px 4px",textAlign:"center",fontSize:11,fontVariantNumeric:"tabular-nums"}}/>
+                              </td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:"#aaa",fontVariantNumeric:"tabular-nums"}}>{target}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:msMet?"#22c55e":phaseColors.ms,fontWeight:msMet?700:400,fontVariantNumeric:"tabular-nums",borderLeft:SEP}}>{msDoneN}/{target}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:pvMet?"#22c55e":phaseColors.pv,fontWeight:pvMet?700:400,fontVariantNumeric:"tabular-nums"}}>{pvDoneN}/{target}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:complete>=100?"#22c55e":"#888",fontWeight:complete>=100?700:400,fontVariantNumeric:"tabular-nums"}}>{complete.toFixed(0)}%</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:remMs>0?phaseColors.ms:"#444",fontVariantNumeric:"tabular-nums",borderLeft:SEP}}>{remMs>0?remMs:"—"}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:remPv>0?phaseColors.pv:"#444",fontVariantNumeric:"tabular-nums"}}>{remPv>0?remPv:"—"}</td>
+                            </tr>
+                          );
+                        })}
+                        {(()=>{
+                          let tN=0,tTarget=0,tMs=0,tPv=0,tRemMs=0,tRemPv=0;
+                          [1,2,3,4,5,6,7,8,9].forEach(mv=>{
+                            const bt=TABLES.filter(t=>t.m===mv); const n=bt.length;
+                            const msDoneN=bt.filter(t=>(phases[t.id]||0)>=3).length;
+                            const pvDoneN=bt.filter(t=>(phases[t.id]||0)>=5).length;
+                            const pct=vreThresholds[mv]??100; const target=Math.ceil(n*pct/100);
+                            tN+=n; tTarget+=target; tMs+=msDoneN; tPv+=pvDoneN;
+                            tRemMs+=Math.max(0,target-msDoneN); tRemPv+=Math.max(0,target-pvDoneN);
+                          });
+                          const tComplete = tTarget>0 ? Math.min(100, tPv/tTarget*100) : 100;
+                          const tMsMet = tMs>=tTarget, tPvMet = tPv>=tTarget;
+                          return (
+                            <tr style={{borderTop:"2px solid #2d2d4a",fontWeight:700}}>
+                              <td style={{padding:"4px 8px",color:"#ccc"}}>TOTAL</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:"#ccc",borderLeft:"1px solid #1e2030"}}>{tN}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:"#444"}}>—</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:"#aaa"}}>{tTarget}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:tMsMet?"#22c55e":phaseColors.ms,borderLeft:"1px solid #1e2030"}}>{tMs}/{tTarget}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:tPvMet?"#22c55e":phaseColors.pv}}>{tPv}/{tTarget}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:tComplete>=100?"#22c55e":"#888"}}>{tComplete.toFixed(0)}%</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:phaseColors.ms,borderLeft:"1px solid #1e2030"}}>{tRemMs}</td>
+                              <td style={{padding:"4px 8px",textAlign:"center",color:phaseColors.pv}}>{tRemPv}</td>
+                            </tr>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginTop:10}}>
+                    <button onClick={()=>setVreThresholds({...VRE_DEFAULTS})}
+                      style={{background:"#0d0d1a",border:"1px solid #1e1e35",color:"#aaa",borderRadius:5,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:600}}>Reset to min. VRE</button>
+                    <button onClick={()=>setVreThresholds(Object.fromEntries([1,2,3,4,5,6,7,8,9].map(z=>[z,100])))}
+                      style={{background:"#0d0d1a",border:"1px solid #1e1e35",color:"#aaa",borderRadius:5,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:600}}>All VRE 100%</button>
                   </div>
                 </Card>
               </div>
