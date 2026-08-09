@@ -47,6 +47,15 @@ const SCB_LIST=[{id:"1A-01",x:185,y:190.5},{id:"1A-02",x:220,y:211},{id:"1A-03",
 function scbMvps(id) { const m = id.match(/(\d+)/); return m ? +m[1] : null; }
 // Colour scale for "how many tables is this SCB still missing" (SCB tab only).
 function scbGapColor(m) { return m===0?"#4ade80": m<=2?"#f5c518": m<=4?"#fb923c": m<=8?"#ef4444":"#991b1b"; }
+// CSV download used by the SCB tab exports. BOM keeps Excel happy with accents.
+function downloadCsv(filename, rows) {
+  const esc = c => { const s = String(c ?? ""); return /[",\n;]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const csv = rows.map(r => r.map(esc).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8;"}));
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 // value = what's actually stored per SCB id (unchanged from before for 0/1/2, so
 // existing data keeps its original meaning); countMode controls how the legend
 // tallies that row without touching the pre-existing count formulas.
@@ -237,6 +246,11 @@ export default function SolarPark() {
   const [scbTooltip, setScbTooltip]       = useState(null);
   const [scbTabHover, setScbTabHover]     = useState(null); // SCB tab map hover (read-only)
   const [scbTabMvps, setScbTabMvps]       = useState(null); // SCB tab MVPS filter
+  const [scbSort, setScbSort]             = useState({ key:"missing", dir:"asc" });
+  const [scbFBucket, setScbFBucket]       = useState(null); // gap bucket filter
+  const [scbFWiring, setScbFWiring]       = useState(null); // wiring state filter
+  const [scbSearch, setScbSearch]         = useState("");
+  const [kpiInfo, setKpiInfo]             = useState(null); // {text,x,y} info tooltip
   const [showLabels, setShowLabels]         = useState(false); 
   const [colorPickerId, setColorPickerId] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -512,6 +526,76 @@ export default function SolarPark() {
       matrix, missingTableSet,
       pctComplete: total ? complete/total*100 : 0 };
   }, [TABLES, phases, scbStatus]);
+  // ── SCB tab: independent pan/zoom (mirrors the main map, own refs so the
+  // two viewports never interfere with each other) ─────────────────────────
+  const scbCanvasRef = useRef(null);
+  const scbGroupRef  = useRef(null);
+  const scbVRef      = useRef({ x:10, y:10, z:1 });
+  const scbDrag      = useRef(null);
+  const scbApply = useCallback(() => {
+    if (scbGroupRef.current) {
+      const {x,y,z} = scbVRef.current;
+      scbGroupRef.current.setAttribute('transform', `translate(${x},${y}) scale(${z})`);
+    }
+  }, []);
+  const scbFit = useCallback(() => {
+    const c = scbCanvasRef.current;
+    if (!c) return;
+    const cw = c.clientWidth || 900, ch = c.clientHeight || 520, pad = 16;
+    const z = Math.min((cw-pad*2)/CW, (ch-pad*2)/CH, 3);
+    scbVRef.current = { x:(cw-CW*z)/2, y:(ch-CH*z)/2, z };
+    scbApply();
+  }, [scbApply]);
+  const scbZoomBy = useCallback((factor) => {
+    const c = scbCanvasRef.current; if (!c) return;
+    const cx = c.clientWidth/2, cy = c.clientHeight/2;
+    const oldZ = scbVRef.current.z;
+    const newZ = Math.min(Math.max(oldZ*factor, 0.1), 12);
+    scbVRef.current.x = cx - (cx - scbVRef.current.x) * (newZ/oldZ);
+    scbVRef.current.y = cy - (cy - scbVRef.current.y) * (newZ/oldZ);
+    scbVRef.current.z = newZ;
+    scbApply();
+  }, [scbApply]);
+  useEffect(() => {
+    if (tab !== "scb") return;
+    const el = scbCanvasRef.current;
+    if (!el) return;
+    const onWheel = e => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      const oldZ = scbVRef.current.z;
+      const newZ = Math.min(Math.max(oldZ * (e.deltaY>0?0.9:1.1), 0.1), 12);
+      scbVRef.current.x = mx - (mx - scbVRef.current.x) * (newZ/oldZ);
+      scbVRef.current.y = my - (my - scbVRef.current.y) * (newZ/oldZ);
+      scbVRef.current.z = newZ;
+      scbApply();
+    };
+    const onDown = e => {
+      scbDrag.current = { mx:e.clientX, my:e.clientY, px:scbVRef.current.x, py:scbVRef.current.y };
+      el.style.cursor = "grabbing";
+    };
+    const onMove = e => {
+      if (!scbDrag.current) return;
+      scbVRef.current.x = scbDrag.current.px + (e.clientX - scbDrag.current.mx);
+      scbVRef.current.y = scbDrag.current.py + (e.clientY - scbDrag.current.my);
+      scbApply();
+    };
+    const onUp = () => { scbDrag.current = null; el.style.cursor = "grab"; };
+    el.addEventListener("wheel", onWheel, {passive:false});
+    el.addEventListener("mousedown", onDown);
+    el.addEventListener("mousemove", onMove);
+    el.addEventListener("mouseup", onUp);
+    el.addEventListener("mouseleave", onUp);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("mousedown", onDown);
+      el.removeEventListener("mousemove", onMove);
+      el.removeEventListener("mouseup", onUp);
+      el.removeEventListener("mouseleave", onUp);
+    };
+  }, [tab, scbApply]);
+  useEffect(() => { if (tab === "scb") { const t = setTimeout(scbFit, 60); return () => clearTimeout(t); } }, [tab, scbFit]);
   const getSubForTable = useCallback((tid) => {
     const s = subs.find(s => s.tables.includes(tid));
     return s ? s.name : "";
@@ -2115,15 +2199,61 @@ export default function SolarPark() {
           .filter(s => !s.complete && s.missing <= 2 && (!mvF || s.mv === mvF))
           .sort((a,b) => a.missing - b.missing || a.id.localeCompare(b.id));
         const pctTo80 = Math.min(100, R.complete / (R.target80 || 1) * 100);
+        const SORTS = {
+          id:      (a,b)=>a.id.localeCompare(b.id),
+          mv:      (a,b)=>a.mv-b.mv                          || a.id.localeCompare(b.id),
+          total:   (a,b)=>a.total-b.total                    || a.id.localeCompare(b.id),
+          mounted: (a,b)=>a.mounted-b.mounted                || a.id.localeCompare(b.id),
+          pct:     (a,b)=>a.mounted/a.total-b.mounted/b.total|| a.id.localeCompare(b.id),
+          missing: (a,b)=>a.missing-b.missing                || a.id.localeCompare(b.id),
+          wiring:  (a,b)=>a.wiring-b.wiring                  || a.id.localeCompare(b.id),
+        };
+        const BTEST = { "0":m=>m===0, "1":m=>m===1, "2":m=>m===2, "3-4":m=>m>=3&&m<=4, "5-8":m=>m>=5&&m<=8, "9+":m=>m>=9 };
+        const q = scbSearch.trim().toUpperCase();
+        const rows = R.items
+          .filter(s => !mvF || s.mv === mvF)
+          .filter(s => !scbFBucket || BTEST[scbFBucket](s.missing))
+          .filter(s => scbFWiring === null || s.wiring === scbFWiring)
+          .filter(s => !q || s.id.toUpperCase().includes(q) || s.missingIds.some(id => id.toUpperCase().includes(q)))
+          .sort(SORTS[scbSort.key] || SORTS.missing);
+        if (scbSort.dir === "desc") rows.reverse();
+        const anyFilter = mvF || scbFBucket || scbFWiring !== null || q;
+        const sel = {background:"#0d0d18",border:"1px solid #2d2d4a",color:"#aaa",borderRadius:4,fontSize:9,padding:"3px 5px",outline:"none"};
+        const SortTh = ({k, label, w, align}) => (
+          <th onClick={()=>setScbSort(p=>({key:k, dir:p.key===k && p.dir==="asc" ? "desc" : "asc"}))}
+            style={{padding:"4px 6px",textAlign:align||"left",width:w,cursor:"pointer",userSelect:"none",
+              color:scbSort.key===k?"#ccc":"#555",fontWeight:scbSort.key===k?700:500,fontSize:8,letterSpacing:0.5,
+              background:"#12121f",position:"sticky",top:0,borderBottom:"1px solid #1e1e35",whiteSpace:"nowrap"}}>
+            {label}{scbSort.key===k ? (scbSort.dir==="asc"?" ▲":" ▼") : ""}
+          </th>
+        );
         const card = {background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px"};
+        const zBtn = {background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#888",borderRadius:4,width:20,height:18,
+          cursor:"pointer",fontSize:11,lineHeight:1,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:0};
+        const btn = {background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#aaa",borderRadius:4,
+          padding:"3px 9px",cursor:"pointer",fontSize:9,fontWeight:600};
         const kpis = [
-          { label:"SCBs COMPLETE",       val:`${R.complete} / ${R.total}`, sub:`${R.pctComplete.toFixed(1)}% · all panels mounted`, color:"#4ade80" },
-          { label:"80% TARGET",          val:`${R.target80}`,              sub:R.gap>0?`${R.gap} SCBs to go`:"reached", color:R.gap>0?"#fb923c":"#22c55e" },
-          { label:"READINESS GAP",       val:`${gapPts.toFixed(1)} pts`,   sub:`PV ${pvPct.toFixed(1)}% vs SCB ${R.pctComplete.toFixed(1)}%`, color:"#f5c518" },
-          { label:"TABLES TO 80% SCB",   val:`${R.greedyTables}`,          sub:`best case · 80% PV needs ${tablesToPv80}`, color:"#818cf8" },
-          { label:"COMPLETE + WIRED",    val:`${readyNow}`,                sub:"mounted and fully wired", color:"#22d3ee" },
-          { label:"ALL PV APPROVED",     val:`${R.completeAppr}`,          sub:"stricter: every table inspected", color:"#666" },
+          { label:"SCBs COMPLETE", val:`${R.complete} / ${R.total}`, sub:`${R.pctComplete.toFixed(1)}% · all panels mounted`, color:"#4ade80",
+            info:"Combiner boxes where every single table it feeds already has its panels mounted (phase 5 or 6 — pending inspection or approved). Only in this state can the box actually be connected. The wiring status you set by hand on the map is tracked separately." },
+          { label:"80% TARGET", val:`${R.target80}`, sub:R.gap>0?`${R.gap} SCBs to go`:"reached", color:R.gap>0?"#fb923c":"#22c55e",
+            info:`80% of the ${R.total} combiner boxes = ${R.target80} boxes. Note this is a different target from the park-wide "80% PV" milestone: that one counts individual tables (${MILESTONE_TABLES}), this one counts whole SCBs, which is what really governs readiness to connect.` },
+          { label:"READINESS GAP", val:`${gapPts.toFixed(1)} pts`, sub:`PV ${pvPct.toFixed(1)}% vs SCB ${R.pctComplete.toFixed(1)}%`, color:"#f5c518",
+            info:"Distance between the share of tables with panels mounted and the share of SCBs fully complete. A wide gap means the work is spread thin over many boxes instead of finishing them one at a time — lots of panels installed, few boxes connectable." },
+          { label:"TABLES TO 80% SCB", val:`${R.greedyTables}`, sub:`best case · 80% PV needs ${tablesToPv80}`, color:"#818cf8",
+            info:`Fewest table-mounts that would bring ${R.target80} SCBs to complete, assuming crews always attack the boxes closest to finished. It is a best case: working in a scattered order can cost several times this. Shown next to it is what the classic 80% PV milestone still needs.` },
+          { label:"COMPLETE + WIRED", val:`${readyNow}`, sub:"mounted and fully wired", color:"#22d3ee",
+            info:'SCBs that are both mechanically complete (all panels mounted) and manually marked "Fully wired". These are the only ones genuinely ready to energise.' },
+          { label:"ALL PV APPROVED", val:`${R.completeAppr}`, sub:"stricter: every table inspected", color:"#666",
+            info:"Stricter variant of complete: every table of the box has passed PV inspection (phase 6), not merely been mounted. Useful as the quality-assured view of the same metric." },
         ];
+        const InfoDot = ({text}) => (
+          <span
+            onMouseEnter={e=>setKpiInfo({text, x:e.clientX, y:e.clientY})}
+            onMouseMove={e=>setKpiInfo(p=>p?{...p, x:e.clientX, y:e.clientY}:p)}
+            onMouseLeave={()=>setKpiInfo(null)}
+            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:11,height:11,borderRadius:"50%",
+              border:"1px solid #3a3a55",color:"#666",fontSize:8,fontWeight:700,cursor:"help",marginLeft:4,lineHeight:1,userSelect:"none"}}>i</span>
+        );
         return (
           <div style={{flex:1,overflowY:"auto",background:"#0a0a12",padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:12}}>
@@ -2141,7 +2271,9 @@ export default function SolarPark() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:9,marginBottom:12}}>
               {kpis.map(k=>(
                 <div key={k.label} style={{...card,textAlign:"center"}}>
-                  <div style={{fontSize:8,color:"#555",letterSpacing:1,marginBottom:5}}>{k.label}</div>
+                  <div style={{fontSize:8,color:"#555",letterSpacing:1,marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {k.label}<InfoDot text={k.info}/>
+                  </div>
                   <div style={{fontSize:19,fontWeight:800,color:k.color,lineHeight:1.1}}>{k.val}</div>
                   <div style={{fontSize:8,color:"#555",marginTop:4}}>{k.sub}</div>
                 </div>
@@ -2161,10 +2293,20 @@ export default function SolarPark() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 250px",gap:12,marginBottom:12}}>
               <div style={{...card,padding:8}}>
-                <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:6,paddingLeft:4}}>
-                  READINESS MAP <span style={{color:"#444",letterSpacing:0}}>· grey = mounted · red = still pending · squares = SCB</span>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,paddingLeft:4}}>
+                  <span style={{fontSize:9,color:"#666",letterSpacing:1}}>READINESS MAP</span>
+                  <span style={{fontSize:8,color:"#444"}}>grey = mounted · red = still pending · squares = SCB</span>
+                  <span style={{marginLeft:"auto",display:"flex",gap:4}}>
+                    <button onClick={()=>scbZoomBy(1.3)} style={zBtn} title="Zoom in">+</button>
+                    <button onClick={()=>scbZoomBy(1/1.3)} style={zBtn} title="Zoom out">−</button>
+                    <button onClick={scbFit} style={{...zBtn,width:"auto",padding:"0 7px",fontSize:9}} title="Fit to screen">↺ Fit</button>
+                  </span>
                 </div>
-                <svg viewBox="0 0 1705 952" style={{width:"100%",display:"block",background:"#0d0d14",borderRadius:5}}>
+                <div ref={scbCanvasRef}
+                  style={{height:520,overflow:"hidden",background:"#0d0d14",borderRadius:5,cursor:"grab",position:"relative"}}>
+                <svg width="100%" height="100%">
+                <g ref={scbGroupRef} transform="translate(10,10) scale(1)">
+                  <rect x={-5} y={-5} width={CW+10} height={CH+10} fill="#0d0d14"/>
                   {TABLES.map(t=>{
                     const miss = R.missingTableSet.has(t.id);
                     const dim = mvF && t.m !== mvF;
@@ -2190,7 +2332,12 @@ export default function SolarPark() {
                         onMouseLeave={()=>setScbTabHover(null)}/>
                     );
                   })}
+                </g>
                 </svg>
+                  <div style={{position:"absolute",bottom:6,right:9,fontSize:8,color:"#3d3d55",pointerEvents:"none"}}>
+                    🔍 scroll = zoom · ✋ drag = pan
+                  </div>
+                </div>
                 <div style={{display:"flex",gap:12,marginTop:7,paddingLeft:4,flexWrap:"wrap"}}>
                   {R.histogram.map(b=>(
                     <div key={b.key} style={{display:"flex",alignItems:"center",gap:5}}>
@@ -2238,8 +2385,24 @@ export default function SolarPark() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={card}>
-                <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:8}}>
-                  QUICK WINS <span style={{color:"#444",letterSpacing:0}}>· SCBs 1–2 tables from complete ({near.length})</span>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <span style={{fontSize:9,color:"#666",letterSpacing:1}}>QUICK WINS</span>
+                  <span style={{fontSize:8,color:"#444"}}>SCBs 1–2 tables from complete ({near.length})</span>
+                  <button style={{...btn,marginLeft:"auto"}} disabled={near.length===0}
+                    title="Download this list as a CSV file"
+                    onClick={()=>downloadCsv(
+                      `SCB_quick_wins${mvF?`_MVPS${mvF}`:""}_${new Date().toISOString().slice(0,10)}.csv`,
+                      [["SCB","MVPS","strings_total","tables_mounted","tables_missing","pending_table_ids","wiring_status"],
+                       ...near.map(s=>[s.id,s.mv,s.total,s.mounted,s.missing,s.missingIds.join(" "),scbStatusEntry(s.wiring).label])]
+                    )}>
+                    ⬇ Export CSV
+                  </button>
+                </div>
+                <div style={{fontSize:8,color:"#555",lineHeight:1.6,marginBottom:8}}>
+                  Combiner boxes that need only one or two more tables mounted to become complete. Finishing these
+                  first is the cheapest way to move the SCB percentage, since each one converts a whole box with
+                  minimal work. The <b style={{color:"#888"}}>pending tables</b> column lists the exact table IDs to
+                  hand to the crews; the CSV carries the same columns for planning offline.
                 </div>
                 {near.length === 0 ? (
                   <div style={{fontSize:10,color:"#555"}}>No SCBs within 2 tables{mvF?` in MVPS ${mvF}`:""}.</div>
@@ -2311,9 +2474,107 @@ export default function SolarPark() {
                 </div>
               </div>
             </div>
+            <div style={{...card,marginTop:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                <span style={{fontSize:9,color:"#666",letterSpacing:1}}>ALL SCBs</span>
+                <span style={{fontSize:8,color:"#444"}}>{rows.length} of {R.total} shown · click any header to sort</span>
+                <button style={{...btn,marginLeft:"auto"}} disabled={rows.length===0}
+                  title="Download exactly what is shown below, in the current order"
+                  onClick={()=>downloadCsv(
+                    `SCB_list_${new Date().toISOString().slice(0,10)}.csv`,
+                    [["SCB","MVPS","strings_total","tables_mounted","tables_missing","pct_mounted","complete","all_pv_approved","wiring_status","pending_table_ids"],
+                     ...rows.map(s=>[s.id,s.mv,s.total,s.mounted,s.missing,(s.mounted/s.total*100).toFixed(1),
+                       s.complete?"yes":"no", s.completeAppr?"yes":"no", scbStatusEntry(s.wiring).label, s.missingIds.join(" ")])]
+                  )}>
+                  ⬇ Export current view
+                </button>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+                <input value={scbSearch} onChange={e=>setScbSearch(e.target.value)}
+                  placeholder="Search SCB or table id…"
+                  style={{...sel,width:150}}/>
+                <select style={sel} value={mvF ?? ""} onChange={e=>setScbTabMvps(e.target.value===""?null:+e.target.value)}>
+                  <option value="">All MVPS</option>
+                  {Object.keys(R.perMvps).map(Number).sort((a,b)=>a-b).map(mv=>(
+                    <option key={mv} value={mv}>MVPS {mv}</option>
+                  ))}
+                </select>
+                <select style={sel} value={scbFBucket ?? ""} onChange={e=>setScbFBucket(e.target.value||null)}>
+                  <option value="">Any gap</option>
+                  {R.histogram.map(b=><option key={b.key} value={b.key}>{b.label} ({b.n})</option>)}
+                </select>
+                <select style={sel} value={scbFWiring ?? ""} onChange={e=>setScbFWiring(e.target.value===""?null:+e.target.value)}>
+                  <option value="">Any wiring state</option>
+                  {SCB_STATUS.map(st=><option key={st.value} value={st.value}>{st.label}</option>)}
+                </select>
+                {anyFilter && (
+                  <button style={btn} onClick={()=>{ setScbTabMvps(null); setScbFBucket(null); setScbFWiring(null); setScbSearch(""); }}>
+                    ✕ Clear filters
+                  </button>
+                )}
+              </div>
+              <div style={{maxHeight:340,overflowY:"auto",border:"1px solid #1a1a2e",borderRadius:5}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:9}}>
+                  <thead>
+                    <tr>
+                      <SortTh k="id" label="SCB" w={62}/>
+                      <SortTh k="mv" label="MVPS" w={58}/>
+                      <SortTh k="mounted" label="MOUNTED" w={70} align="right"/>
+                      <SortTh k="pct" label="%" w={46} align="right"/>
+                      <SortTh k="missing" label="MISSING" w={58} align="right"/>
+                      <SortTh k="wiring" label="WIRING" w={120}/>
+                      <SortTh k="id" label="PENDING TABLES"/>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(s=>{
+                      const st = scbStatusEntry(s.wiring);
+                      const pc = s.mounted/s.total*100;
+                      return (
+                        <tr key={s.id}
+                          onMouseEnter={()=>setScbTabHover(s.id)} onMouseLeave={()=>setScbTabHover(null)}
+                          style={{background:scbTabHover===s.id?"#1a1a2e":"transparent",borderBottom:"1px solid #15151f"}}>
+                          <td style={{padding:"3px 6px",fontWeight:700,color:"#ddd"}}>{s.id}</td>
+                          <td style={{padding:"3px 6px"}}>
+                            <span style={{display:"inline-block",width:9,height:7,borderRadius:2,background:BC[s.mv],marginRight:5,verticalAlign:"middle"}}/>
+                            <span style={{color:"#999"}}>{s.mv}</span>
+                          </td>
+                          <td style={{padding:"3px 6px",textAlign:"right",color:"#999"}}>{s.mounted}/{s.total}</td>
+                          <td style={{padding:"3px 6px",textAlign:"right",color:pc===100?"#4ade80":"#888"}}>{pc.toFixed(0)}%</td>
+                          <td style={{padding:"3px 6px",textAlign:"right",fontWeight:700,color:scbGapColor(s.missing)}}>
+                            {s.missing===0?"✓":s.missing}
+                          </td>
+                          <td style={{padding:"3px 6px",color:st.color,whiteSpace:"nowrap"}}>
+                            <span style={{display:"inline-block",width:7,height:7,borderRadius:2,marginRight:5,verticalAlign:"middle",
+                              background:st.outline?"transparent":st.color,border:st.outline?`1px solid ${st.color}`:"none"}}/>
+                            {st.label}
+                          </td>
+                          <td style={{padding:"3px 6px",fontFamily:"monospace",color:"#f87171",maxWidth:0,overflow:"hidden",
+                            textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={s.missingIds.join(", ")}>
+                            {s.missingIds.join(" ") || <span style={{color:"#2f6650",fontFamily:"inherit"}}>—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {rows.length===0 && (
+                      <tr><td colSpan={7} style={{padding:"14px 8px",textAlign:"center",color:"#555",fontSize:10}}>
+                        No SCBs match the current filters.
+                      </td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <div style={{fontSize:8,color:"#444",marginTop:10}}>
               Note: SCB 8A-04 is the only combiner feeding tables in two MVPS (8 and 9); it is counted under MVPS 8.
             </div>
+            {kpiInfo && (
+              <div style={{position:"fixed",left:Math.min(kpiInfo.x+14, window.innerWidth-330),top:kpiInfo.y+16,width:300,
+                background:"#12121f",border:"1px solid #2d2d4a",borderRadius:6,padding:"8px 11px",fontSize:10,color:"#aaa",
+                lineHeight:1.6,pointerEvents:"none",zIndex:200,boxShadow:"0 6px 22px rgba(0,0,0,.75)"}}>
+                {kpiInfo.text}
+              </div>
+            )}
           </div>
         );
       })()}
