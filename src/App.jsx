@@ -45,6 +45,8 @@ function buildTables() {
 }
 const SCB_LIST=[{id:"1A-01",x:185,y:190.5},{id:"1A-02",x:220,y:211},{id:"1A-03",x:220,y:231},{id:"1A-04",x:220,y:244.5},{id:"1A-05",x:220,y:265},{id:"1B-06",x:220,y:278.5},{id:"1B-07",x:220,y:292},{id:"1B-08",x:107,y:295.5},{id:"1B-09",x:107,y:315.5},{id:"1B-10",x:107,y:329},{id:"1C-11",x:107,y:356.5},{id:"1C-12",x:181.5,y:309},{id:"1C-13",x:181.5,y:336},{id:"1C-14",x:181.5,y:362.5},{id:"1C-15",x:181.5,y:396.5},{id:"1D-16",x:199,y:403},{id:"1D-17",x:199,y:376},{id:"1D-18",x:199,y:349},{id:"1D-19",x:199,y:329},{id:"2A-01",x:448.5,y:345},{id:"2A-02",x:448.5,y:338},{id:"2A-03",x:448.5,y:324.5},{id:"2A-04",x:448.5,y:318},{id:"2B-05",x:393,y:298.5},{id:"2B-06",x:359.5,y:329},{id:"2B-07",x:359.5,y:349.5},{id:"2B-08",x:359.5,y:369.5},{id:"2C-09",x:359.5,y:390},{id:"2C-10",x:359.5,y:417},{id:"2C-11",x:439,y:336},{id:"2C-12",x:439,y:356},{id:"2D-13",x:439,y:376.5},{id:"2D-14",x:439,y:396.5},{id:"2D-15",x:438.5,y:423.5},{id:"2D-16",x:448.5,y:489.5},{id:"2E-17",x:448.5,y:469},{id:"2E-18",x:448.5,y:455.5},{id:"2E-19",x:448.5,y:435.5},{id:"2E-20",x:448.5,y:422},{id:"2F-21",x:448.5,y:402},{id:"2F-22",x:448.5,y:388.5},{id:"2F-23",x:448.5,y:381.5},{id:"2F-24",x:557.5,y:368},{id:"2G-25",x:557.5,y:381.5},{id:"2G-26",x:557.5,y:408.5},{id:"2G-27",x:557.5,y:422},{id:"2G-28",x:557.5,y:435.5},{id:"2H-29",x:557.5,y:455.5},{id:"2H-30",x:557.5,y:469},{id:"2H-31",x:557.5,y:482.5},{id:"2H-32",x:557.5,y:496},{id:"3A-01",x:438.5,y:464},{id:"3A-02",x:438.5,y:497.5},{id:"3A-03",x:452,y:518},{id:"3A-04",x:452,y:538},{id:"3B-05",x:452,y:545},{id:"3B-06",x:452,y:578.5},{id:"3B-07",x:452,y:599},{id:"3B-08",x:452,y:625.5},{id:"3C-09",x:465.5,y:522},{id:"3C-10",x:465.5,y:535.5},{id:"3C-11",x:465.5,y:549},{id:"3C-12",x:465.5,y:569.5},{id:"3D-13",x:465.5,y:583},{id:"3D-14",x:465.5,y:596.5},{id:"3D-15",x:465.5,y:616.5},{id:"3D-16",x:465.5,y:630},{id:"4A-01",x:452,y:652.5},{id:"4A-02",x:452,y:666},{id:"4A-03",x:452,y:686.5},{id:"4A-04",x:452,y:713.5},{id:"4B-05",x:452,y:733.5},{id:"4B-06",x:452,y:760.5},{id:"4B-07",x:452,y:781},{id:"4B-08",x:434.5,y:808},{id:"4C-09",x:434.5,y:828},{id:"4C-10",x:434.5,y:855},{id:"4C-11",x:455.5,y:785},{id:"4C-12",x:455.5,y:771.5},{id:"4D-13",x:455.5,y:751.5},{id:"4D-14",x:455.5,y:724.5},{id:"4D-15",x:455.5,y:697.5},{id:"4D-16",x:455.5,y:670.5},{id:"5A-01",x:576.5,y:522},{id:"5A-02",x:576.5,y:542.5},{id:"5A-03",x:576.5,y:562.5},{id:"5B-04",x:576.5,y:583},{id:"5B-05",x:576.5,y:610},{id:"5B-06",x:576.5,y:616.5},{id:"5C-07",x:598.5,y:670.5},{id:"5C-08",x:598.5,y:684},{id:"5C-09",x:598.5,y:711},{id:"5D-10",x:598.5,y:731},{id:"5D-11",x:598.5,y:744.5},{id:"5D-12",x:602,y:691},{id:"5D-13",x:602,y:664},{id:"5E-14",x:701,y:657},{id:"5E-15",x:736,y:684},{id:"5E-16",x:736,y:697.5},{id:"5F-17",x:843.5,y:717.5},{id:"5F-18",x:843.5,y:738},{id:"5F-19",x:843.5,y:758},{id:"5F-20",x:843.5,y:792},{id:"5G-21",x:846,y:704.5},{id:"5G-22",x:846,y:731},{id:"5G-23",x:846,y:751.5},{id:"5H-24",x:846,y:765},{id:"5H-25",x:846,y:778.5},{id:"5H-26",x:846,y:798.5},{id:"6A-01",x:834,y:454.5},{id:"6A-02",x:834,y:441},{id:"6A-03",x:834,y:414},{id:"6A-04",x:834,y:400.5},{id:"6A-05",x:834,y:380.5},{id:"6B-06",x:834,y:360.5},{id:"6B-07",x:834,y:340},{id:"6B-08",x:834,y:326.5},{id:"6B-09",x:834,y:293},{id:"6C-10",x:829.5,y:299.5},{id:"6C-11",x:829.5,y:320},{id:"6C-12",x:829.5,y:347},{id:"6C-13",x:829.5,y:353.5},{id:"6C-14",x:829.5,y:367},{id:"6D-15",x:829.5,y:387.5},{id:"6D-16",x:829.5,y:407.5},{id:"6D-17",x:829.5,y:421},{id:"6D-18",x:829.5,y:434.5},{id:"6D-19",x:829.5,y:448},{id:"7A-01",x:1153.5,y:338},{id:"7A-02",x:1153.5,y:358},{id:"7A-03",x:1153.5,y:371.5},{id:"7A-04",x:1246,y:365},{id:"7B-05",x:1048,y:297},{id:"7B-06",x:1142,y:336.5},{id:"7B-07",x:1142,y:370},{id:"7B-08",x:1142,y:390.5},{id:"7C-09",x:1142,y:410.5},{id:"7C-10",x:1142,y:417.5},{id:"7C-11",x:1142,y:451},{id:"7C-12",x:1142,y:464.5},{id:"7D-13",x:1142,y:478},{id:"7D-14",x:1142,y:491.5},{id:"7D-15",x:1142,y:511.5},{id:"7D-16",x:1142,y:525},{id:"7E-17",x:1153.5,y:511.5},{id:"7E-18",x:1153.5,y:491.5},{id:"7E-19",x:1153.5,y:478},{id:"7E-20",x:1153.5,y:458},{id:"7E-21",x:1153.5,y:437.5},{id:"7F-22",x:1153.5,y:424},{id:"7F-23",x:1153.5,y:410.5},{id:"7F-24",x:1261.5,y:525},{id:"7F-25",x:1261.5,y:505},{id:"7G-26",x:1261.5,y:491.5},{id:"7G-27",x:1261.5,y:478},{id:"7G-28",x:1261.5,y:464.5},{id:"7G-29",x:1261.5,y:451},{id:"7G-30",x:1261.5,y:437.5},{id:"7H-31",x:1261.5,y:424},{id:"7H-32",x:1261.5,y:410.5},{id:"7H-33",x:1261.5,y:397},{id:"7H-34",x:1406.5,y:424.5},{id:"7H-35",x:1406.5,y:444.5},{id:"8A-01",x:1261.5,y:606},{id:"8A-02",x:1261.5,y:586},{id:"8A-03",x:1261.5,y:565.5},{id:"8A-04",x:1261.5,y:545.5},{id:"8B-05",x:1153.5,y:599.5},{id:"8B-06",x:1153.5,y:586},{id:"8B-07",x:1153.5,y:565.5},{id:"8B-08",x:1153.5,y:552},{id:"8B-09",x:1153.5,y:532},{id:"8C-10",x:1261.5,y:640},{id:"8C-11",x:1261.5,y:660},{id:"8C-12",x:1261.5,y:680.5},{id:"8C-13",x:1261.5,y:700.5},{id:"8D-14",x:1261.5,y:721},{id:"8D-15",x:1261.5,y:734.5},{id:"8D-16",x:1153.5,y:640},{id:"8D-17",x:1153.5,y:653.5},{id:"8E-18",x:1153.5,y:667},{id:"8E-19",x:1153.5,y:687},{id:"8E-20",x:1153.5,y:700.5},{id:"8E-21",x:1153.5,y:727.5},{id:"8F-22",x:1153.5,y:734.5},{id:"8F-23",x:1153.5,y:748},{id:"8F-24",x:1142,y:754.5},{id:"8F-25",x:1142,y:734},{id:"8G-26",x:1142,y:714},{id:"8G-27",x:1142,y:687},{id:"8G-28",x:1142,y:660},{id:"8G-29",x:1142,y:640},{id:"8G-30",x:1142,y:626.5},{id:"8H-31",x:1142,y:606},{id:"8H-32",x:1142,y:592.5},{id:"8H-33",x:1142,y:572.5},{id:"8H-34",x:1142,y:559},{id:"8H-35",x:1142,y:545.5},{id:"9A-01",x:1584.5,y:640},{id:"9A-02",x:1584.5,y:660.5},{id:"9A-03",x:1584.5,y:680.5},{id:"9A-04",x:1584.5,y:700.5},{id:"9B-05",x:1586.5,y:694},{id:"9B-06",x:1586.5,y:667},{id:"9B-07",x:1586.5,y:647},{id:"9B-08",x:1586.5,y:626.5},{id:"9C-09",x:1586.5,y:613},{id:"9C-10",x:1586.5,y:586},{id:"9C-11",x:1586.5,y:559},{id:"9C-12",x:1586.5,y:532},{id:"9D-13",x:1584.5,y:539},{id:"9D-14",x:1584.5,y:552.5},{id:"9D-15",x:1584.5,y:579.5},{id:"9D-16",x:1584.5,y:593},{id:"9D-17",x:1584.5,y:606.5},{id:"9E-18",x:1406.5,y:606.5},{id:"9E-19",x:1406.5,y:586},{id:"9E-20",x:1406.5,y:572.5},{id:"9E-21",x:1406.5,y:545.5},{id:"9F-22",x:1406.5,y:525.5},{id:"9F-23",x:1406.5,y:512},{id:"9F-24",x:1406.5,y:492},{id:"9F-25",x:1406.5,y:465},{id:"9F-26",x:1404,y:532},{id:"9G-27",x:1404,y:566},{id:"9G-28",x:1404,y:599.5},{id:"9G-29",x:1404,y:647},{id:"9G-30",x:1404,y:680.5},{id:"9G-31",x:1404,y:721},{id:"9H-32",x:1406.5,y:714},{id:"9H-33",x:1406.5,y:694},{id:"9H-34",x:1406.5,y:673.5},{id:"9H-35",x:1406.5,y:660.5},{id:"9H-36",x:1406.5,y:640}];
 function scbMvps(id) { const m = id.match(/(\d+)/); return m ? +m[1] : null; }
+// Colour scale for "how many tables is this SCB still missing" (SCB tab only).
+function scbGapColor(m) { return m===0?"#4ade80": m<=2?"#f5c518": m<=4?"#fb923c": m<=8?"#ef4444":"#991b1b"; }
 // value = what's actually stored per SCB id (unchanged from before for 0/1/2, so
 // existing data keeps its original meaning); countMode controls how the legend
 // tallies that row without touching the pre-existing count formulas.
@@ -233,6 +235,8 @@ export default function SolarPark() {
   const [scbStatus, setScbStatus]         = useState({});
   const [hoveredScb, setHoveredScb]       = useState(null);
   const [scbTooltip, setScbTooltip]       = useState(null);
+  const [scbTabHover, setScbTabHover]     = useState(null); // SCB tab map hover (read-only)
+  const [scbTabMvps, setScbTabMvps]       = useState(null); // SCB tab MVPS filter
   const [showLabels, setShowLabels]         = useState(false); 
   const [colorPickerId, setColorPickerId] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -450,6 +454,64 @@ export default function SolarPark() {
   const pct  = (pvDone/total*100).toFixed(1);
   const milestoneReached = pvExecuted >= MILESTONE_TABLES;
   const milestonePct = Math.min(pvExecuted/(MILESTONE_TABLES||1)*100, 100).toFixed(1);
+  // ── SCB readiness (read-only analytics for the SCB tab) ──────────────────
+  // An SCB is "complete" when every table it feeds has its panels mounted
+  // (phase >= 5, i.e. pvExecuted's definition — inspected or not). This is
+  // independent of the manual wiring state in scbStatus.
+  const scbReadiness = useMemo(() => {
+    const byScb = {};
+    TABLES.forEach(t => { if (t.scb) (byScb[t.scb] = byScb[t.scb] || []).push(t); });
+    const items = Object.keys(byScb).sort().map(id => {
+      const ts = byScb[id];
+      const missing = ts.filter(t => (phases?.[t.id]||0) < 5);
+      const missingAppr = ts.filter(t => (phases?.[t.id]||0) < 6);
+      return {
+        id, mv: scbMvps(id), total: ts.length,
+        mounted: ts.length - missing.length,
+        missing: missing.length,
+        missingIds: missing.map(t => t.id),
+        complete: missing.length === 0,
+        completeAppr: missingAppr.length === 0,
+        wiring: scbStatus[id] || 0,
+      };
+    });
+    const total = items.length;
+    const complete = items.filter(s => s.complete).length;
+    const completeAppr = items.filter(s => s.completeAppr).length;
+    const target80 = Math.ceil(total * 0.8);
+    const BUCKETS = [
+      { key:"0",   label:"Complete",      test:m=>m===0,        color:"#4ade80" },
+      { key:"1",   label:"1 table away",  test:m=>m===1,        color:"#f5c518" },
+      { key:"2",   label:"2 tables away", test:m=>m===2,        color:"#f5c518" },
+      { key:"3-4", label:"3–4 away",      test:m=>m>=3&&m<=4,   color:"#fb923c" },
+      { key:"5-8", label:"5–8 away",      test:m=>m>=5&&m<=8,   color:"#ef4444" },
+      { key:"9+",  label:"9+ away",       test:m=>m>=9,         color:"#991b1b" },
+    ];
+    const histogram = BUCKETS.map(b => ({ ...b, n: items.filter(s => b.test(s.missing)).length }));
+    const perMvps = {};
+    items.forEach(s => {
+      const e = perMvps[s.mv] = perMvps[s.mv] || { tot:0, done:0, near:0, missingTables:0 };
+      e.tot++; if (s.complete) e.done++; else if (s.missing<=2) e.near++;
+      e.missingTables += s.missing;
+    });
+    // Best-case tables to mount to reach the 80% SCB target, if work is
+    // sequenced by closest-to-complete first.
+    const sortedMissing = items.map(s => s.missing).sort((a,b)=>a-b);
+    let greedyTables = 0;
+    for (let i = 0; i < Math.min(target80, sortedMissing.length); i++) greedyTables += sortedMissing[i];
+    // wiring x mechanical cross-check
+    const matrix = SCB_STATUS.map(st => ({
+      label: st.label, color: st.color, outline: !!st.outline,
+      complete:   items.filter(s => s.wiring===st.value && s.complete).length,
+      incomplete: items.filter(s => s.wiring===st.value && !s.complete).length,
+    }));
+    const missingTableSet = new Set(items.flatMap(s => s.missingIds));
+    const byId = {}; items.forEach(s => { byId[s.id] = s; });
+    return { items, byId, total, complete, completeAppr, target80,
+      gap: Math.max(0, target80-complete), histogram, perMvps, greedyTables,
+      matrix, missingTableSet,
+      pctComplete: total ? complete/total*100 : 0 };
+  }, [TABLES, phases, scbStatus]);
   const getSubForTable = useCallback((tid) => {
     const s = subs.find(s => s.tables.includes(tid));
     return s ? s.name : "";
@@ -807,7 +869,7 @@ export default function SolarPark() {
             </button>
           </div>
           <div style={{display:"flex",gap:1,background:"#0d0d14",borderRadius:5,padding:2,marginLeft:4}}>
-            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"]].map(([t,l])=>(
+            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"],["scb","🔌 SCB"]].map(([t,l])=>(
               <button key={t} onClick={()=>{ setTab(t); if(t==="map") setTimeout(fitToScreen,50); }}
                 style={{background:tab===t?"#818cf8":"#1a1a2e",border:`1px solid ${tab===t?"#818cf8":"#2d2d4a"}`,color:tab===t?"#000":"#888",borderRadius:5,padding:"5px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===t?700:500,letterSpacing:0.3,transition:"all .15s"}}>{l}</button>
             ))}
@@ -2036,6 +2098,221 @@ export default function SolarPark() {
                   </Card>
                 </div>
               )}
+            </div>
+          </div>
+        );
+      })()}
+      {tab==="scb" && (() => {
+        const R = scbReadiness;
+        const T = TABLES.length;
+        const mvF = scbTabMvps;
+        const hov = scbTabHover ? R.byId[scbTabHover] : null;
+        const pvPct = pvExecuted / T * 100;
+        const gapPts = pvPct - R.pctComplete;
+        const tablesToPv80 = Math.max(0, MILESTONE_TABLES - pvExecuted);
+        const readyNow = R.items.filter(s => s.complete && s.wiring === 2).length;
+        const near = R.items
+          .filter(s => !s.complete && s.missing <= 2 && (!mvF || s.mv === mvF))
+          .sort((a,b) => a.missing - b.missing || a.id.localeCompare(b.id));
+        const pctTo80 = Math.min(100, R.complete / (R.target80 || 1) * 100);
+        const card = {background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px"};
+        const kpis = [
+          { label:"SCBs COMPLETE",       val:`${R.complete} / ${R.total}`, sub:`${R.pctComplete.toFixed(1)}% · all panels mounted`, color:"#4ade80" },
+          { label:"80% TARGET",          val:`${R.target80}`,              sub:R.gap>0?`${R.gap} SCBs to go`:"reached", color:R.gap>0?"#fb923c":"#22c55e" },
+          { label:"READINESS GAP",       val:`${gapPts.toFixed(1)} pts`,   sub:`PV ${pvPct.toFixed(1)}% vs SCB ${R.pctComplete.toFixed(1)}%`, color:"#f5c518" },
+          { label:"TABLES TO 80% SCB",   val:`${R.greedyTables}`,          sub:`best case · 80% PV needs ${tablesToPv80}`, color:"#818cf8" },
+          { label:"COMPLETE + WIRED",    val:`${readyNow}`,                sub:"mounted and fully wired", color:"#22d3ee" },
+          { label:"ALL PV APPROVED",     val:`${R.completeAppr}`,          sub:"stricter: every table inspected", color:"#666" },
+        ];
+        return (
+          <div style={{flex:1,overflowY:"auto",background:"#0a0a12",padding:"14px 16px"}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:12}}>
+              <span style={{fontSize:14,fontWeight:800,color:"#f5a623"}}>🔌 SCB readiness</span>
+              <span style={{fontSize:10,color:"#555"}}>
+                An SCB counts as complete only when <b style={{color:"#888"}}>every</b> table it feeds has its panels mounted (inspected or not).
+              </span>
+              {mvF && (
+                <button onClick={()=>setScbTabMvps(null)}
+                  style={{marginLeft:"auto",background:"#1e1e35",border:`1px solid ${BC[mvF]}`,color:BC[mvF],borderRadius:4,padding:"2px 9px",cursor:"pointer",fontSize:10,fontWeight:700}}>
+                  MVPS {mvF} ✕
+                </button>
+              )}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:9,marginBottom:12}}>
+              {kpis.map(k=>(
+                <div key={k.label} style={{...card,textAlign:"center"}}>
+                  <div style={{fontSize:8,color:"#555",letterSpacing:1,marginBottom:5}}>{k.label}</div>
+                  <div style={{fontSize:19,fontWeight:800,color:k.color,lineHeight:1.1}}>{k.val}</div>
+                  <div style={{fontSize:8,color:"#555",marginTop:4}}>{k.sub}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{...card,marginBottom:12,padding:"11px 14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#888",marginBottom:5}}>
+                <span>Progress towards <b style={{color:"#bbb"}}>{R.target80} complete SCBs</b> (80% of the park)</span>
+                <span style={{color:R.complete>=R.target80?"#22c55e":"#fb923c",fontWeight:700}}>{pctTo80.toFixed(1)}%</span>
+              </div>
+              <div style={{height:8,background:"#0d0d18",borderRadius:4,overflow:"hidden",display:"flex"}}>
+                <div style={{height:"100%",width:pctTo80+"%",background:"linear-gradient(90deg,#22c55e,#4ade80)",borderRadius:4,transition:"width .3s"}}/>
+              </div>
+              <div style={{fontSize:8,color:"#555",marginTop:4}}>
+                {R.greedyTables} more table-mounts if sequenced SCB-first · scattered work can cost several times that
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 250px",gap:12,marginBottom:12}}>
+              <div style={{...card,padding:8}}>
+                <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:6,paddingLeft:4}}>
+                  READINESS MAP <span style={{color:"#444",letterSpacing:0}}>· grey = mounted · red = still pending · squares = SCB</span>
+                </div>
+                <svg viewBox="0 0 1705 952" style={{width:"100%",display:"block",background:"#0d0d14",borderRadius:5}}>
+                  {TABLES.map(t=>{
+                    const miss = R.missingTableSet.has(t.id);
+                    const dim = mvF && t.m !== mvF;
+                    const onHov = hov && t.scb === hov.id;
+                    return (
+                      <rect key={`sr-${t.id}`} x={t.x+ROX} y={t.y+ROY} width={RW} height={RH} rx={0.5}
+                        fill={miss?"#6d1f24":"#1c2233"}
+                        fillOpacity={dim?0.12:1}
+                        stroke={onHov?"#ffffff":"none"} strokeWidth={onHov?1.2:0}/>
+                    );
+                  })}
+                  {SCB_LIST.map(s=>{
+                    const it = R.byId[s.id];
+                    if(!it) return null;
+                    const dim = mvF && it.mv !== mvF;
+                    const isHov = hov && hov.id === s.id;
+                    return (
+                      <rect key={`srs-${s.id}`} x={s.x-2.6} y={s.y-2.6} width={5.2} height={5.2} rx={0.8}
+                        fill={scbGapColor(it.missing)} fillOpacity={dim?0.15:1}
+                        stroke={isHov?"#fff":"#07070d"} strokeWidth={isHov?1.6:0.9}
+                        style={{cursor:"pointer"}}
+                        onMouseEnter={()=>setScbTabHover(s.id)}
+                        onMouseLeave={()=>setScbTabHover(null)}/>
+                    );
+                  })}
+                </svg>
+                <div style={{display:"flex",gap:12,marginTop:7,paddingLeft:4,flexWrap:"wrap"}}>
+                  {R.histogram.map(b=>(
+                    <div key={b.key} style={{display:"flex",alignItems:"center",gap:5}}>
+                      <div style={{width:9,height:9,borderRadius:2,background:b.color}}/>
+                      <span style={{fontSize:9,color:"#888"}}>{b.label}</span>
+                      <span style={{fontSize:9,color:"#ccc",fontWeight:700}}>{b.n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{...card,padding:"11px 12px"}}>
+                {hov ? (<>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{hov.id}</div>
+                  <div style={{fontSize:9,color:BC[hov.mv],marginTop:1}}>MVPS {hov.mv} · {hov.total} strings</div>
+                  <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
+                  <div style={{fontSize:20,fontWeight:800,color:scbGapColor(hov.missing),lineHeight:1}}>
+                    {hov.complete ? "COMPLETE" : `${hov.missing} missing`}
+                  </div>
+                  <div style={{fontSize:9,color:"#666",marginTop:3}}>{hov.mounted}/{hov.total} tables mounted</div>
+                  <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden",margin:"7px 0"}}>
+                    <div style={{height:"100%",width:(hov.mounted/hov.total*100)+"%",background:scbGapColor(hov.missing),borderRadius:3}}/>
+                  </div>
+                  <div style={{fontSize:9,color:scbStatusEntry(hov.wiring).color,marginTop:6}}>
+                    ⚑ {scbStatusEntry(hov.wiring).label}
+                  </div>
+                  {hov.missingIds.length>0 && (<>
+                    <div style={{fontSize:8,color:"#555",letterSpacing:1,margin:"9px 0 4px"}}>PENDING TABLES</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:3,maxHeight:150,overflowY:"auto"}}>
+                      {hov.missingIds.map(id=>(
+                        <span key={id} style={{fontSize:9,fontFamily:"monospace",background:"#2a1010",color:"#f87171",border:"1px solid #f8717133",borderRadius:3,padding:"1px 5px"}}>{id}</span>
+                      ))}
+                    </div>
+                  </>)}
+                </>) : (
+                  <div style={{fontSize:10,color:"#555",lineHeight:1.7}}>
+                    <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:6}}>SCB DETAIL</div>
+                    Hover any SCB square on the map to see its pending tables, wiring state and progress.
+                    <div style={{height:1,background:"#1e1e35",margin:"10px 0"}}/>
+                    <div style={{fontSize:9,color:"#666"}}>
+                      {R.total} SCBs · {R.items.reduce((a,s)=>a+s.missing,0)} table-mounts outstanding across the park.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={card}>
+                <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:8}}>
+                  QUICK WINS <span style={{color:"#444",letterSpacing:0}}>· SCBs 1–2 tables from complete ({near.length})</span>
+                </div>
+                {near.length === 0 ? (
+                  <div style={{fontSize:10,color:"#555"}}>No SCBs within 2 tables{mvF?` in MVPS ${mvF}`:""}.</div>
+                ) : (
+                  <div style={{maxHeight:250,overflowY:"auto"}}>
+                    {near.map(s=>(
+                      <div key={s.id}
+                        onMouseEnter={()=>setScbTabHover(s.id)} onMouseLeave={()=>setScbTabHover(null)}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"4px 6px",borderRadius:4,marginBottom:2,
+                          background:scbTabHover===s.id?"#1e1e35":"transparent",cursor:"default"}}>
+                        <div style={{width:8,height:8,borderRadius:2,background:BC[s.mv],flexShrink:0}}/>
+                        <span style={{fontSize:10,fontWeight:700,color:"#ddd",width:58,flexShrink:0}}>{s.id}</span>
+                        <span style={{fontSize:9,color:"#f5c518",width:52,flexShrink:0}}>−{s.missing} table{s.missing===1?"":"s"}</span>
+                        <span style={{flex:1,fontSize:9,fontFamily:"monospace",color:"#f87171",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {s.missingIds.join(", ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                <div style={card}>
+                  <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:8}}>BY MVPS <span style={{color:"#444",letterSpacing:0}}>· click to filter</span></div>
+                  <div style={{display:"flex",padding:"0 4px 3px"}}>
+                    <span style={{flex:1}}/>
+                    <span style={{fontSize:7,color:"#444",width:44,textAlign:"right"}}>complete</span>
+                    <span style={{fontSize:7,color:"#444",width:34,textAlign:"right"}}>≤2 away</span>
+                    <span style={{fontSize:7,color:"#444",width:44,textAlign:"right"}}>tables left</span>
+                  </div>
+                  {Object.keys(R.perMvps).map(Number).sort((a,b)=>a-b).map(mv=>{
+                    const e = R.perMvps[mv];
+                    const pct = e.done/e.tot*100;
+                    return (
+                      <div key={mv} onClick={()=>setScbTabMvps(p=>p===mv?null:mv)}
+                        style={{display:"flex",alignItems:"center",gap:6,padding:"3px 4px",borderRadius:3,marginBottom:2,cursor:"pointer",
+                          background:mvF===mv?"#1e1e35":"transparent",border:`1px solid ${mvF===mv?"#2d2d4a":"transparent"}`}}>
+                        <div style={{width:16,height:8,borderRadius:2,background:BC[mv],flexShrink:0}}/>
+                        <span style={{fontSize:9,color:"#ccc",width:48,flexShrink:0}}>MVPS {mv}</span>
+                        <div style={{flex:1,height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:pct+"%",background:pct>=80?"#4ade80":pct>0?"#f5c518":"#ef4444",borderRadius:3}}/>
+                        </div>
+                        <span style={{fontSize:9,color:e.done?"#ccc":"#666",width:44,textAlign:"right",flexShrink:0}}>{e.done}/{e.tot}</span>
+                        <span style={{fontSize:9,color:e.near?"#f5c518":"#444",width:34,textAlign:"right",flexShrink:0}}>{e.near}</span>
+                        <span style={{fontSize:9,color:"#888",width:44,textAlign:"right",flexShrink:0}}>{e.missingTables}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={card}>
+                  <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:8}}>WIRING vs PANELS <span style={{color:"#444",letterSpacing:0}}>· cross-check</span></div>
+                  <div style={{display:"flex",padding:"0 4px 3px"}}>
+                    <span style={{flex:1}}/>
+                    <span style={{fontSize:7,color:"#444",width:60,textAlign:"right"}}>panels done</span>
+                    <span style={{fontSize:7,color:"#444",width:60,textAlign:"right"}}>panels left</span>
+                  </div>
+                  {R.matrix.map(m=>(
+                    <div key={m.label} style={{display:"flex",alignItems:"center",gap:7,padding:"3px 4px",marginBottom:1}}>
+                      <div style={{width:9,height:9,borderRadius:2,flexShrink:0,
+                        background:m.outline?"transparent":m.color,border:m.outline?`1px solid ${m.color}`:"none"}}/>
+                      <span style={{flex:1,fontSize:9,color:"#bbb"}}>{m.label}</span>
+                      <span style={{fontSize:9,color:m.complete?"#4ade80":"#444",width:60,textAlign:"right"}}>{m.complete}</span>
+                      <span style={{fontSize:9,color:m.incomplete?"#f87171":"#444",width:60,textAlign:"right"}}>{m.incomplete}</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:8,color:"#555",marginTop:6,lineHeight:1.5}}>
+                    "Fully wired" with panels left is a data inconsistency worth checking; "Not started" with panels done is ready to wire.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style={{fontSize:8,color:"#444",marginTop:10}}>
+              Note: SCB 8A-04 is the only combiner feeding tables in two MVPS (8 and 9); it is counted under MVPS 8.
             </div>
           </div>
         );
