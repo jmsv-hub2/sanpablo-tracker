@@ -47,6 +47,134 @@ const SCB_LIST=[{id:"1A-01",x:185,y:190.5},{id:"1A-02",x:220,y:211},{id:"1A-03",
 function scbMvps(id) { const m = id.match(/(\d+)/); return m ? +m[1] : null; }
 // Colour scale for "how many tables is this SCB still missing" (SCB tab only).
 function scbGapColor(m) { return m===0?"#4ade80": m<=2?"#f5c518": m<=4?"#fb923c": m<=8?"#ef4444":"#991b1b"; }
+// ── Minimal dependency-free .xlsx writer (used by the SCB tab exports) ──────
+// Builds a real OOXML package so Excel opens it fully styled and without the
+// "format doesn't match extension" warning that SpreadsheetML/CSV produce.
+const XLSX_CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[i] = c >>> 0; }
+  return t;
+})();
+function xlsxCrc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = XLSX_CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function xlsxZip(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name), data = enc.encode(f.body);
+    const crc = xlsxCrc32(data), size = data.length;
+    const lh = new Uint8Array(30 + name.length), lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(8, 0, true);
+    lv.setUint16(12, 0x21, true); lv.setUint32(14, crc, true);
+    lv.setUint32(18, size, true); lv.setUint32(22, size, true); lv.setUint16(26, name.length, true);
+    lh.set(name, 30);
+    parts.push(lh, data);
+    const ch = new Uint8Array(46 + name.length), cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+    cv.setUint16(10, 0, true); cv.setUint16(14, 0x21, true); cv.setUint32(16, crc, true);
+    cv.setUint32(20, size, true); cv.setUint32(24, size, true); cv.setUint16(28, name.length, true);
+    cv.setUint32(42, offset, true); ch.set(name, 46);
+    central.push(ch);
+    offset += lh.length + size;
+  });
+  const cdSize = central.reduce((a, c) => a + c.length, 0);
+  const eocd = new Uint8Array(22), ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true);
+  const all = [...parts, ...central, eocd];
+  const out = new Uint8Array(all.reduce((a, c) => a + c.length, 0));
+  let p = 0; all.forEach(c => { out.set(c, p); p += c.length; });
+  return out;
+}
+function xEsc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function xCol(n) { let s = ""; n++; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
+// style ids: 1 title · 2 subtitle · 3 header · 4 text · 5 num · 6 pct · 7 mono · 8 good · 9 warn · 10 bad
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="8">
+<font><sz val="11"/><name val="Calibri"/></font>
+<font><sz val="16"/><b/><color rgb="FF1F2937"/><name val="Calibri"/></font>
+<font><sz val="9"/><i/><color rgb="FF6B7280"/><name val="Calibri"/></font>
+<font><sz val="11"/><b/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+<font><sz val="10"/><b/><color rgb="FF15803D"/><name val="Calibri"/></font>
+<font><sz val="10"/><b/><color rgb="FFB45309"/><name val="Calibri"/></font>
+<font><sz val="10"/><b/><color rgb="FFB91C1C"/><name val="Calibri"/></font>
+<font><sz val="9"/><color rgb="FF6B7280"/><name val="Consolas"/></font>
+</fonts>
+<fills count="3">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF4F46E5"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
+<borders count="2">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"><color rgb="FFD1D5DB"/></left><right style="thin"><color rgb="FFD1D5DB"/></right><top style="thin"><color rgb="FFD1D5DB"/></top><bottom style="thin"><color rgb="FFD1D5DB"/></bottom><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="11">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="9" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="0" fontId="7" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="6" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+</cellXfs>
+</styleSheet>`;
+const XLSX_KIND_STYLE = { text:4, num:5, pct:6, mono:7, good:8, warn:9, bad:10 };
+function downloadXlsx(filename, { sheetName = "Sheet1", title, subtitle, columns, rows }) {
+  const nc = columns.length;
+  const cells = (vals, rowIdx) => vals.map((cell, i) => {
+    const o = (cell && typeof cell === "object" && "v" in cell) ? cell : { v: cell };
+    const kind = o.kind || columns[i].kind || "text";
+    const s = XLSX_KIND_STYLE[kind] ?? 4;
+    const ref = `${xCol(i)}${rowIdx}`;
+    // Anything genuinely numeric is written as a number so Excel sorts and
+    // filters it properly, even when it carries a colour kind like good/bad.
+    const numeric = (typeof o.v === "number" && isFinite(o.v)) ||
+      ((kind === "num" || kind === "pct") && o.v !== "" && o.v !== null && o.v !== undefined && !isNaN(o.v));
+    return numeric
+      ? `<c r="${ref}" s="${s}"><v>${o.v}</v></c>`
+      : `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xEsc(o.v)}</t></is></c>`;
+  }).join("");
+  const head = `<row r="4" ht="26" customHeight="1">${columns.map((c,i)=>`<c r="${xCol(i)}4" s="3" t="inlineStr"><is><t>${xEsc(c.label)}</t></is></c>`).join("")}</row>`;
+  const body = rows.map((r, n) => `<row r="${5+n}">${cells(r, 5+n)}</row>`).join("");
+  const lastCol = xCol(nc - 1), lastRow = 4 + rows.length;
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>${columns.map((c,i)=>`<col min="${i+1}" max="${i+1}" width="${c.width||14}" customWidth="1"/>`).join("")}</cols>
+<sheetData>
+<row r="1" ht="24" customHeight="1"><c r="A1" s="1" t="inlineStr"><is><t>${xEsc(title)}</t></is></c></row>
+<row r="2" ht="15" customHeight="1"><c r="A2" s="2" t="inlineStr"><is><t>${xEsc(subtitle)}</t></is></c></row>
+<row r="3" ht="6" customHeight="1"/>
+${head}${body}
+</sheetData>
+<autoFilter ref="A4:${lastCol}${lastRow}"/>
+<mergeCells count="2"><mergeCell ref="A1:${lastCol}1"/><mergeCell ref="A2:${lastCol}2"/></mergeCells>
+</worksheet>`;
+  const files = [
+    { name:"[Content_Types].xml", body:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+    { name:"_rels/.rels", body:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name:"xl/workbook.xml", body:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xEsc(sheetName).slice(0,31)}" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name:"xl/_rels/workbook.xml.rels", body:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+    { name:"xl/styles.xml", body:XLSX_STYLES },
+    { name:"xl/worksheets/sheet1.xml", body:sheet },
+  ];
+  const url = URL.createObjectURL(new Blob([xlsxZip(files)], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 // CSV download used by the SCB tab exports. BOM keeps Excel happy with accents.
 function downloadCsv(filename, rows) {
   const esc = c => { const s = String(c ?? ""); return /[",\n;]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
@@ -2218,6 +2346,14 @@ export default function SolarPark() {
           .sort(SORTS[scbSort.key] || SORTS.missing);
         if (scbSort.dir === "desc") rows.reverse();
         const anyFilter = mvF || scbFBucket || scbFWiring !== null || q;
+        const today = new Date().toISOString().slice(0,10);
+        const activeFilters = [
+          mvF ? `MVPS ${mvF}` : null,
+          scbFBucket ? R.histogram.find(b=>b.key===scbFBucket)?.label : null,
+          scbFWiring !== null ? scbStatusEntry(scbFWiring).label : null,
+          q ? `search "${scbSearch.trim()}"` : null,
+        ].filter(Boolean);
+        const filterLabel = activeFilters.length ? ` · filtered by ${activeFilters.join(", ")}` : " · no filters applied";
         const sel = {background:"#0d0d18",border:"1px solid #2d2d4a",color:"#aaa",borderRadius:4,fontSize:9,padding:"3px 5px",outline:"none"};
         const SortTh = ({k, label, w, align}) => (
           <th onClick={()=>setScbSort(p=>({key:k, dir:p.key===k && p.dir==="asc" ? "desc" : "asc"}))}
@@ -2246,14 +2382,8 @@ export default function SolarPark() {
           { label:"ALL PV APPROVED", val:`${R.completeAppr}`, sub:"stricter: every table inspected", color:"#666",
             info:"Stricter variant of complete: every table of the box has passed PV inspection (phase 6), not merely been mounted. Useful as the quality-assured view of the same metric." },
         ];
-        const InfoDot = ({text}) => (
-          <span
-            onMouseEnter={e=>setKpiInfo({text, x:e.clientX, y:e.clientY})}
-            onMouseMove={e=>setKpiInfo(p=>p?{...p, x:e.clientX, y:e.clientY}:p)}
-            onMouseLeave={()=>setKpiInfo(null)}
-            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:11,height:11,borderRadius:"50%",
-              border:"1px solid #3a3a55",color:"#666",fontSize:8,fontWeight:700,cursor:"help",marginLeft:4,lineHeight:1,userSelect:"none"}}>i</span>
-        );
+        const infoDot = {display:"inline-flex",alignItems:"center",justifyContent:"center",width:11,height:11,borderRadius:"50%",
+          border:"1px solid #3a3a55",color:"#666",fontSize:8,fontWeight:700,cursor:"help",marginLeft:4,lineHeight:1,userSelect:"none"};
         return (
           <div style={{flex:1,overflowY:"auto",background:"#0a0a12",padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:12}}>
@@ -2270,9 +2400,14 @@ export default function SolarPark() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:9,marginBottom:12}}>
               {kpis.map(k=>(
-                <div key={k.label} style={{...card,textAlign:"center"}}>
+                <div key={k.label} style={{...card,textAlign:"center"}}
+                  onMouseLeave={()=>setKpiInfo(null)}>
                   <div style={{fontSize:8,color:"#555",letterSpacing:1,marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {k.label}<InfoDot text={k.info}/>
+                    {k.label}
+                    <span style={infoDot}
+                      onMouseEnter={e=>setKpiInfo({text:k.info, x:e.clientX, y:e.clientY})}
+                      onMouseMove={e=>setKpiInfo({text:k.info, x:e.clientX, y:e.clientY})}
+                      onMouseLeave={()=>setKpiInfo(null)}>i</span>
                   </div>
                   <div style={{fontSize:19,fontWeight:800,color:k.color,lineHeight:1.1}}>{k.val}</div>
                   <div style={{fontSize:8,color:"#555",marginTop:4}}>{k.sub}</div>
@@ -2388,14 +2523,35 @@ export default function SolarPark() {
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                   <span style={{fontSize:9,color:"#666",letterSpacing:1}}>QUICK WINS</span>
                   <span style={{fontSize:8,color:"#444"}}>SCBs 1–2 tables from complete ({near.length})</span>
-                  <button style={{...btn,marginLeft:"auto"}} disabled={near.length===0}
-                    title="Download this list as a CSV file"
+                  <button style={{...btn,marginLeft:"auto",borderColor:"#2f6650",color:"#4ade80"}} disabled={near.length===0}
+                    title="Download a formatted Excel workbook"
+                    onClick={()=>downloadXlsx(`SCB_quick_wins${mvF?`_MVPS${mvF}`:""}_${today}.xlsx`, {
+                      sheetName:"Quick wins",
+                      title:"San Pablo Solar — SCB quick wins",
+                      subtitle:`${near.length} combiner boxes one or two tables from complete${mvF?` · MVPS ${mvF} only`:""} · a box counts as complete when every table it feeds has its panels mounted · generated ${today}`,
+                      columns:[
+                        {label:"SCB",            width:12, kind:"text"},
+                        {label:"MVPS",           width:8,  kind:"num"},
+                        {label:"Strings",        width:9,  kind:"num"},
+                        {label:"Mounted",        width:10, kind:"num"},
+                        {label:"Missing",        width:9},
+                        {label:"% mounted",      width:11, kind:"pct"},
+                        {label:"Wiring status",  width:24, kind:"text"},
+                        {label:"Pending tables", width:46, kind:"mono"},
+                      ],
+                      rows: near.map(s=>[s.id, s.mv, s.total, s.mounted,
+                        {v:s.missing, kind:"warn"}, s.mounted/s.total,
+                        scbStatusEntry(s.wiring).label, s.missingIds.join(", ")]),
+                    })}>
+                    ⬇ Excel
+                  </button>
+                  <button style={btn} disabled={near.length===0} title="Plain CSV for other tools"
                     onClick={()=>downloadCsv(
-                      `SCB_quick_wins${mvF?`_MVPS${mvF}`:""}_${new Date().toISOString().slice(0,10)}.csv`,
+                      `SCB_quick_wins${mvF?`_MVPS${mvF}`:""}_${today}.csv`,
                       [["SCB","MVPS","strings_total","tables_mounted","tables_missing","pending_table_ids","wiring_status"],
                        ...near.map(s=>[s.id,s.mv,s.total,s.mounted,s.missing,s.missingIds.join(" "),scbStatusEntry(s.wiring).label])]
                     )}>
-                    ⬇ Export CSV
+                    CSV
                   </button>
                 </div>
                 <div style={{fontSize:8,color:"#555",lineHeight:1.6,marginBottom:8}}>
@@ -2478,15 +2634,42 @@ export default function SolarPark() {
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:9,color:"#666",letterSpacing:1}}>ALL SCBs</span>
                 <span style={{fontSize:8,color:"#444"}}>{rows.length} of {R.total} shown · click any header to sort</span>
-                <button style={{...btn,marginLeft:"auto"}} disabled={rows.length===0}
-                  title="Download exactly what is shown below, in the current order"
+                <button style={{...btn,marginLeft:"auto",borderColor:"#2f6650",color:"#4ade80"}} disabled={rows.length===0}
+                  title="Download exactly what is shown below, in the current order, as a formatted Excel workbook"
+                  onClick={()=>downloadXlsx(`SCB_list_${today}.xlsx`, {
+                    sheetName:"SCB readiness",
+                    title:"San Pablo Solar — SCB readiness",
+                    subtitle:`${rows.length} of ${R.total} combiner boxes${filterLabel} · sorted by ${scbSort.key} ${scbSort.dir} · ${R.complete} complete (${R.pctComplete.toFixed(1)}%), target ${R.target80} · generated ${today}`,
+                    columns:[
+                      {label:"SCB",             width:12, kind:"text"},
+                      {label:"MVPS",            width:8,  kind:"num"},
+                      {label:"Strings",         width:9,  kind:"num"},
+                      {label:"Mounted",         width:10, kind:"num"},
+                      {label:"Missing",         width:9},
+                      {label:"% mounted",       width:11, kind:"pct"},
+                      {label:"Complete",        width:11},
+                      {label:"All PV approved", width:15},
+                      {label:"Wiring status",   width:24, kind:"text"},
+                      {label:"Pending tables",  width:60, kind:"mono"},
+                    ],
+                    rows: rows.map(s=>[s.id, s.mv, s.total, s.mounted,
+                      {v:s.missing, kind:s.missing===0?"good":s.missing<=2?"warn":"bad"},
+                      s.mounted/s.total,
+                      {v:s.complete?"YES":"no", kind:s.complete?"good":"text"},
+                      {v:s.completeAppr?"YES":"no", kind:s.completeAppr?"good":"text"},
+                      scbStatusEntry(s.wiring).label,
+                      s.missingIds.join(", ")]),
+                  })}>
+                  ⬇ Excel — current view
+                </button>
+                <button style={btn} disabled={rows.length===0} title="Plain CSV for other tools"
                   onClick={()=>downloadCsv(
-                    `SCB_list_${new Date().toISOString().slice(0,10)}.csv`,
+                    `SCB_list_${today}.csv`,
                     [["SCB","MVPS","strings_total","tables_mounted","tables_missing","pct_mounted","complete","all_pv_approved","wiring_status","pending_table_ids"],
                      ...rows.map(s=>[s.id,s.mv,s.total,s.mounted,s.missing,(s.mounted/s.total*100).toFixed(1),
                        s.complete?"yes":"no", s.completeAppr?"yes":"no", scbStatusEntry(s.wiring).label, s.missingIds.join(" ")])]
                   )}>
-                  ⬇ Export current view
+                  CSV
                 </button>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
