@@ -175,15 +175,6 @@ ${head}${body}
   a.href = url; a.download = filename; document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
-// CSV download used by the SCB tab exports. BOM keeps Excel happy with accents.
-function downloadCsv(filename, rows) {
-  const esc = c => { const s = String(c ?? ""); return /[",\n;]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
-  const csv = rows.map(r => r.map(esc).join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8;"}));
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
 // value = what's actually stored per SCB id (unchanged from before for 0/1/2, so
 // existing data keeps its original meaning); countMode controls how the legend
 // tallies that row without touching the pre-existing count formulas.
@@ -379,6 +370,7 @@ export default function SolarPark() {
   const [scbFWiring, setScbFWiring]       = useState(null); // wiring state filter
   const [scbSearch, setScbSearch]         = useState("");
   const [kpiInfo, setKpiInfo]             = useState(null); // {text,x,y} info tooltip
+  const [scbLabels, setScbLabels]         = useState(false); // SCB tab map labels
   const [showLabels, setShowLabels]         = useState(false); 
   const [colorPickerId, setColorPickerId] = useState(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -2431,7 +2423,15 @@ export default function SolarPark() {
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,paddingLeft:4}}>
                   <span style={{fontSize:9,color:"#666",letterSpacing:1}}>READINESS MAP</span>
                   <span style={{fontSize:8,color:"#444"}}>grey = mounted · red = still pending · squares = SCB</span>
-                  <span style={{marginLeft:"auto",display:"flex",gap:4}}>
+                  <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontSize:8,color:"#666",letterSpacing:0.5}}>🏷️ LABELS</span>
+                    <button onClick={()=>setScbLabels(v=>!v)}
+                      title="Show SCB and table IDs on the map (zoom in to read them)"
+                      style={{background:scbLabels?"#f5a623":"#1e1e35",border:`1px solid ${scbLabels?"#f5a623":"#2d2d4a"}`,
+                        color:scbLabels?"#000":"#555",borderRadius:3,padding:"1px 8px",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                      {scbLabels?"ON":"OFF"}
+                    </button>
+                    <span style={{width:8}}/>
                     <button onClick={()=>scbZoomBy(1.3)} style={zBtn} title="Zoom in">+</button>
                     <button onClick={()=>scbZoomBy(1/1.3)} style={zBtn} title="Zoom out">−</button>
                     <button onClick={scbFit} style={{...zBtn,width:"auto",padding:"0 7px",fontSize:9}} title="Fit to screen">↺ Fit</button>
@@ -2465,6 +2465,34 @@ export default function SolarPark() {
                         style={{cursor:"pointer"}}
                         onMouseEnter={()=>setScbTabHover(s.id)}
                         onMouseLeave={()=>setScbTabHover(null)}/>
+                    );
+                  })}
+                  {/* Labels drawn last so they sit on top of every marker */}
+                  {scbLabels && TABLES.map(t=>{
+                    const dim = mvF && t.m !== mvF;
+                    return (
+                      <text key={`srtl-${t.id}`} x={t.x+ROX+RW/2} y={t.y+ROY+RH/2}
+                        textAnchor="middle" dominantBaseline="central"
+                        fontSize={1.8} fill="rgba(255,255,255,0.85)" fillOpacity={dim?0.15:1}
+                        fontWeight="500" pointerEvents="none"
+                        style={{userSelect:"none",fontFamily:"monospace"}}>
+                        {t.id}
+                      </text>
+                    );
+                  })}
+                  {scbLabels && SCB_LIST.map(s=>{
+                    const it = R.byId[s.id];
+                    if(!it) return null;
+                    const dim = mvF && it.mv !== mvF;
+                    return (
+                      <text key={`srsl-${s.id}`} x={s.x} y={s.y-3.4}
+                        textAnchor="middle" dominantBaseline="auto"
+                        fontSize={2.4} fill={scbGapColor(it.missing)} fillOpacity={dim?0.2:1}
+                        fontWeight="700" pointerEvents="none"
+                        style={{userSelect:"none",fontFamily:"monospace",paintOrder:"stroke"}}
+                        stroke="#07070d" strokeWidth={0.6}>
+                        {s.id}
+                      </text>
                     );
                   })}
                 </g>
@@ -2543,15 +2571,7 @@ export default function SolarPark() {
                         {v:s.missing, kind:"warn"}, s.mounted/s.total,
                         scbStatusEntry(s.wiring).label, s.missingIds.join(", ")]),
                     })}>
-                    ⬇ Excel
-                  </button>
-                  <button style={btn} disabled={near.length===0} title="Plain CSV for other tools"
-                    onClick={()=>downloadCsv(
-                      `SCB_quick_wins${mvF?`_MVPS${mvF}`:""}_${today}.csv`,
-                      [["SCB","MVPS","strings_total","tables_mounted","tables_missing","pending_table_ids","wiring_status"],
-                       ...near.map(s=>[s.id,s.mv,s.total,s.mounted,s.missing,s.missingIds.join(" "),scbStatusEntry(s.wiring).label])]
-                    )}>
-                    CSV
+                    ⬇ Export
                   </button>
                 </div>
                 <div style={{fontSize:8,color:"#555",lineHeight:1.6,marginBottom:8}}>
@@ -2660,16 +2680,7 @@ export default function SolarPark() {
                       scbStatusEntry(s.wiring).label,
                       s.missingIds.join(", ")]),
                   })}>
-                  ⬇ Excel — current view
-                </button>
-                <button style={btn} disabled={rows.length===0} title="Plain CSV for other tools"
-                  onClick={()=>downloadCsv(
-                    `SCB_list_${today}.csv`,
-                    [["SCB","MVPS","strings_total","tables_mounted","tables_missing","pct_mounted","complete","all_pv_approved","wiring_status","pending_table_ids"],
-                     ...rows.map(s=>[s.id,s.mv,s.total,s.mounted,s.missing,(s.mounted/s.total*100).toFixed(1),
-                       s.complete?"yes":"no", s.completeAppr?"yes":"no", scbStatusEntry(s.wiring).label, s.missingIds.join(" ")])]
-                  )}>
-                  CSV
+                  ⬇ Export
                 </button>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
