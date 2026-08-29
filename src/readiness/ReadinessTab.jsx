@@ -248,6 +248,7 @@ const MainChart = memo(function MainChart({ curves, activeKey, proj, crossing, t
     setHover(i >= 0 && i < N ? i : null);
   };
   const hv = hover != null ? { d: days[hover].d, req: active.points[hover].req, mw: proj[hover].mw } : null;
+  const fmtReq = (v) => v > TOTAL_MWDC ? `${v.toFixed(1)} ✕` : v.toFixed(2);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -296,11 +297,27 @@ const MainChart = memo(function MainChart({ curves, activeKey, proj, crossing, t
         <text x={L} y={H - 6} fontSize={8} fill="#3d3d55">solid {active.sc.label.toLowerCase()} · faint: other scenarios · white: projected mounted DC · red band: target not demonstrable (&gt; 65.02)</text>
       </svg>
       {hv && (
-        <div style={{ position: 'absolute', top: 6, right: 8, background: '#1a1a2e', border: '1px solid #3a3a55', borderRadius: 5, padding: '6px 9px', fontSize: 9, color: '#bbb', pointerEvents: 'none' }}>
-          <b style={{ color: '#fff' }}>{fmtDY(hv.d)}</b><br />
-          required <b style={{ color: hv.req > TOTAL_MWDC ? '#ef4444' : active.sc.color }}>{hv.req > TOTAL_MWDC ? `${hv.req.toFixed(1)} — not feasible` : hv.req.toFixed(2)}</b> MWdc<br />
-          projected <b style={{ color: '#e5e7eb' }}>{hv.mw.toFixed(2)}</b> MWdc<br />
-          margin <b style={{ color: hv.mw >= hv.req ? '#4ade80' : '#fb923c' }}>{(hv.mw - hv.req).toFixed(2)}</b> MWdc
+        <div style={{ position: 'absolute', top: 6, right: 8, background: '#1a1a2e', border: '1px solid #3a3a55', borderRadius: 5, padding: '6px 9px', fontSize: 9, color: '#bbb', pointerEvents: 'none', minWidth: 168 }}>
+          <b style={{ color: '#fff' }}>{fmtDY(hv.d)}</b>
+          <div style={{ color: '#666', fontSize: 8, margin: '2px 0 1px' }}>required MWdc (✕ = &gt; 65.02 cap)</div>
+          {curves.map((c) => {
+            const v = c.points[hover].req;
+            const isActive = c.sc.key === activeKey;
+            return (
+              <div key={c.sc.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ color: c.sc.color, fontWeight: isActive ? 800 : 500 }}>{c.sc.label.toLowerCase()}{isActive ? ' ●' : ''}</span>
+                <b style={{ color: v > TOTAL_MWDC ? '#ef4444' : c.sc.color }}>{fmtReq(v)}</b>
+              </div>
+            );
+          })}
+          <div style={{ height: 1, background: '#3a3a55', margin: '3px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span>projected</span><b style={{ color: '#e5e7eb' }}>{hv.mw.toFixed(2)}</b>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span>margin ({active.sc.label.toLowerCase()})</span>
+            <b style={{ color: hv.mw >= hv.req ? '#4ade80' : '#fb923c' }}>{(hv.mw - hv.req).toFixed(2)}</b>
+          </div>
         </div>
       )}
     </div>
@@ -336,6 +353,11 @@ const ParkTree = memo(function ParkTree({ park }) {
             <span key={k}>{i > 0 && ' · '}<b style={{ color: v.color }}>{v.label.toLowerCase()}</b> {park.invList.filter((x) => x.status === k).length}</span>
           ))}
         </span>
+      </div>
+      <div style={{ fontSize: 8, color: '#555', lineHeight: 1.5, marginBottom: 8 }}>
+        <b style={{ color: INV_STATUS.started.color }}>startable</b> = at least one mounted string behind an approved SCB (reaches the 905 V start-up voltage) ·{' '}
+        <b style={{ color: INV_STATUS.noscb.color }}>no scb</b> = has mounted strings but none behind an approved SCB ·{' '}
+        <b style={{ color: INV_STATUS.dark.color }}>dark</b> = no strings mounted at all, the inverter cannot energise (ER3 needs every one started, so each dark unit needs ≥1 string)
       </div>
       {Object.values(park.mvps).map((m) => {
         const open = openMv.has(m.mv);
@@ -434,12 +456,12 @@ export default function ReadinessTab() {
   useEffect(() => { load(); }, [load]);
 
   // ── controls state ────────────────────────────────────────────────────────
-  const DEFAULT_EXEC = useMemo(() => ({ targetMW: 50, crews: 6, prod: 4, workdays: 6, startISO: toISO(todayNoon()), useProgress: true }), []);
+  const DEFAULT_EXEC = useMemo(() => ({ targetMW: 50, rate: 24, workdays: 6, startISO: toISO(todayNoon()), useProgress: true }), []);
   const [exec, setExec] = useState(DEFAULT_EXEC);
   const setE = (patch) => setExec((p) => ({ ...p, ...patch }));
   const [env, setEnv] = useState({ ...DEFAULT_ENV });
   const setV = (patch) => setEnv((p) => ({ ...p, ...patch }));
-  const rate = exec.crews * exec.prod;
+  const rate = exec.rate;
   const activeSc = SCENARIOS.find((s) => s.key === env.scenario) || SCENARIOS[1];
   const scModified = activeSc && (env.poaMult !== activeSc.poaMult || env.tambOff !== activeSc.tambOff || env.soiling !== activeSc.soiling);
 
@@ -492,7 +514,7 @@ export default function ReadinessTab() {
 
   // rate → earliest date
   const rateRows = useMemo(() => {
-    const rates = [...new Set([12, 16, 20, 24, 28, 32, 36, 40, Math.round(rate)])].sort((a, b) => a - b);
+    const rates = [...new Set([10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, Math.round(rate)])].sort((a, b) => a - b);
     return rates.map((r) => ({
       r,
       cur: Math.abs(r - rate) < 0.5,
@@ -562,7 +584,7 @@ export default function ReadinessTab() {
       label: 'INVERTERS STARTABLE', color: park.startedInvs === 56 ? '#4ade80' : '#fb923c',
       val: `${park.startedInvs} / 56`,
       sub: `${park.noScbInvs} with modules but no approved SCB · ${park.darkInvs.length} dark`,
-      info: 'SG1100UD units with at least one mounted string behind an approved SCB. Start-up is a voltage condition, not power: one 30-module string gives 1,083 V at 60 °C, above the 905 V start threshold. ER3 requires ALL inverters started to verify reactive capability.',
+      info: 'SG1100UD units with at least one mounted string behind an approved SCB. Start-up is a voltage condition, not power: one 30-module string gives 1,083 V at 60 °C, above the 905 V start threshold. "Dark" = units with no strings mounted at all, which cannot energise yet. ER3 requires ALL inverters started to verify reactive capability.',
     },
     {
       label: 'MVPS5 LOCK-IN', color: forcedAtCross === null ? '#666' : forcedAtCross > 0 ? '#f5a623' : '#4ade80',
@@ -624,17 +646,9 @@ export default function ReadinessTab() {
                 </div>
               </div>
               <div>
-                <div style={lbl}>CREWS × TABLES/CREW/DAY<Info text="Mounting workforce: crews × productivity. The combined rate can also be edited directly — both stay in sync (editing the rate adjusts productivity)." /></div>
-                <input type="number" min={1} step={1} value={exec.crews} style={{ ...numIn, width: 40 }}
-                  onChange={(e) => setE({ crews: Math.max(1, Math.round(+e.target.value || 1)) })} />
-                <span style={{ color: '#555', fontSize: 10 }}> × </span>
-                <input type="number" min={0.5} step={0.5} value={exec.prod} style={{ ...numIn, width: 44 }}
-                  onChange={(e) => setE({ prod: Math.max(0.1, +e.target.value || 0.1) })} />
-              </div>
-              <div>
-                <div style={lbl}>TABLES / DAY (COMBINED)<Info text="Total mounting rate per workday. Observed on the tracker: ~24 tables per workday over the last 4 weeks (~140/week on 6-day weeks)." /></div>
-                <input type="number" min={1} step={1} value={+rate.toFixed(1)} style={numIn}
-                  onChange={(e) => setE({ prod: Math.max(0.1, (+e.target.value || 1) / exec.crews) })} />
+                <div style={lbl}>TABLES / DAY<Info text="Total mounting rate per workday. Observed on the tracker: ~24 tables per workday over the last 4 weeks (~140/week on 6-day weeks)." /></div>
+                <input type="number" min={1} step={1} value={rate} style={numIn}
+                  onChange={(e) => setE({ rate: Math.max(1, +e.target.value || 1) })} />
                 <span style={{ fontSize: 8, color: '#444', marginLeft: 6 }}>≈ {(rate * exec.workdays).toFixed(0)}/week</span>
               </div>
               <div>
@@ -927,7 +941,7 @@ export default function ReadinessTab() {
                 ))}
               </div>
               <div style={{ fontSize: 9, color: '#888', lineHeight: 1.6, marginBottom: 8 }}>
-                {park.darkInvs.length} dark inverters hold <b style={{ color: '#ddd' }}>{park.darkStrings} strings = {(park.darkStrings * STRING_KWP / 1000).toFixed(2)} MWdc</b>.
+                {park.darkInvs.length} <b style={{ color: '#ef4444' }}>dark</b> inverters (no strings mounted yet, cannot energise) hold <b style={{ color: '#ddd' }}>{park.darkStrings} strings = {(park.darkStrings * STRING_KWP / 1000).toFixed(2)} MWdc</b>.
                 Rest of the park caps at <b style={{ color: '#ddd' }}>{((TOTAL_STRINGS - park.darkStrings) * STRING_KWP / 1000).toFixed(2)} MWdc</b>.
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9 }}>
