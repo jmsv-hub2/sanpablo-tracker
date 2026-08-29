@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import GridTab from "./GridTab.jsx"; // demo, local only — read-only grid-connection planner
+import ReadinessEntry from "./readiness/ReadinessEntry.jsx"; // read-only ER3 readiness tab (lazy-loaded + error-isolated)
 const PHASE_DEFS = [
   { id:0, label:"Not started",                   group:null },
   { id:1, label:"Screwpiles pending inspection", group:"sp" },
@@ -1073,7 +1075,7 @@ export default function SolarPark() {
             </button>
           </div>
           <div style={{display:"flex",gap:1,background:"#0d0d14",borderRadius:5,padding:2,marginLeft:4}}>
-            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"],["scb","🔌 SCB"]].map(([t,l])=>(
+            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"],["scb","🔌 SCB"],["grid","⚡ Grid"],["readiness","🎯 Readiness"]].map(([t,l])=>(
               <button key={t} onClick={()=>{ setTab(t); if(t==="map") setTimeout(fitToScreen,50); }}
                 style={{background:tab===t?"#818cf8":"#1a1a2e",border:`1px solid ${tab===t?"#818cf8":"#2d2d4a"}`,color:tab===t?"#000":"#888",borderRadius:5,padding:"5px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===t?700:500,letterSpacing:0.3,transition:"all .15s"}}>{l}</button>
             ))}
@@ -2306,6 +2308,11 @@ export default function SolarPark() {
           </div>
         );
       })()}
+      {tab==="grid" && (
+        <GridTab TABLES={TABLES} SCB_LIST={SCB_LIST} BC={BC} DIMS={{CW,CH,RW,RH,ROX,ROY}}
+          phases={phases} scbStatus={scbStatus} downloadXlsx={downloadXlsx} scbStatusEntry={scbStatusEntry} />
+      )}
+      {tab==="readiness" && <ReadinessEntry />}
       {tab==="scb" && (() => {
         const R = scbReadiness;
         const T = TABLES.length;
