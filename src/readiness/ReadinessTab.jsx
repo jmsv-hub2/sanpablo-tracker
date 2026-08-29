@@ -456,7 +456,7 @@ export default function ReadinessTab() {
   useEffect(() => { load(); }, [load]);
 
   // ── controls state ────────────────────────────────────────────────────────
-  const DEFAULT_EXEC = useMemo(() => ({ targetMW: 50, rate: 24, workdays: 6, startISO: toISO(todayNoon()), useProgress: true }), []);
+  const DEFAULT_EXEC = useMemo(() => ({ targetMW: 25, rate: 24, workdays: 6, startISO: toISO(todayNoon()), useProgress: true }), []);
   const [exec, setExec] = useState(DEFAULT_EXEC);
   const setE = (patch) => setExec((p) => ({ ...p, ...patch }));
   const [env, setEnv] = useState({ ...DEFAULT_ENV });
