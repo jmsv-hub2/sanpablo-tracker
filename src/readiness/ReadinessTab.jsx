@@ -582,11 +582,10 @@ export default function ReadinessTab() {
       <div style={{ flex: 1, overflowY: 'auto', background: '#0a0a12', padding: '14px 16px', color: '#ddd', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 14, fontWeight: 800, color: '#f5a623' }}>🎯 ER3 readiness</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#f5a623' }}>🎯 Minimum DC</span>
           <span style={{ fontSize: 10, color: '#555' }}>
-            Minimum DC to demonstrate {exec.targetMW} MWac at the delivery point · audited clear-sky model · live mounting progress
+            Minimum DC to demonstrate {exec.targetMW} MWac at the delivery point under ER3 · audited clear-sky model · live mounting progress
           </span>
-          <span style={{ fontSize: 8, fontWeight: 700, color: '#f87171', border: '1px solid #f8717155', borderRadius: 3, padding: '1px 6px', letterSpacing: 1 }}>DEMO · LOCAL ONLY</span>
           <span style={{ marginLeft: 'auto', fontSize: 9, color: data.error ? '#ef4444' : '#555' }}>
             {data.loading ? '⟳ loading live data…' : data.error ? `⚠ ${data.error} — showing empty progress` : `data ${data.loadedAt?.toLocaleTimeString()}`}
           </span>
@@ -964,7 +963,7 @@ export default function ReadinessTab() {
 
         <div style={{ fontSize: 8, color: '#3d3d55', lineHeight: 1.6, paddingBottom: 8 }}>
           Model: audited clear-sky (Haurwitz) minimum-DC study · k(t) = 0.9165-chain (soiling & bifacial adjustable) × POA/1000 × (1 − 0.0029·(Tcell−25)) · peak reach criterion, 09–17 h solar ·
-          Bendt clearness screening (γ 1.98 Sep / 1.26 Oct) · live progress from the tracker read-only endpoints. Demo only — nothing is written back.
+          Bendt clearness screening (γ 1.98 Sep / 1.26 Oct) · live progress from the tracker read-only endpoints. Read-only — nothing is written back.
         </div>
 
         {tip && (
