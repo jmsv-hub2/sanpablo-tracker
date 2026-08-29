@@ -511,7 +511,8 @@ export default function ReadinessTab() {
   const today = todayNoon();
   const reqToday = reqCache.get(dayKey(today)) ?? dcRequired(today, env, exec.targetMW);
   const margin = park.mountedMW - reqToday;
-  const forcedAtCross = crossing ? forcedIntoDark(crossing.dcReq, park.darkStrings) : null;
+  const invGap = 56 - park.startedInvs;
+  const powerOnly = !data.loading && !data.error && invGap > 0;
 
   // rate → earliest date
   const rateRows = useMemo(() => {
@@ -561,7 +562,9 @@ export default function ReadinessTab() {
       label: 'ACHIEVABLE DATE', color: crossing ? '#4ade80' : '#ef4444',
       val: crossing ? fmtD(crossing.date) : 'not in horizon',
       sub: crossing ? `${Math.ceil((crossing.date - startDate) / 86400e3 / 7)} weeks at ${rate.toFixed(0)}/day · needs ${crossing.dcReq.toFixed(1)} MWdc` : `no crossing within 500 days at ${rate.toFixed(0)}/day`,
-      info: 'First date on which the projected mounted DC meets the minimum DC required to demonstrate the AC target that same day, under the active weather scenario. Reaching the daily peak is enough — it does not need to be sustained.',
+      border: powerOnly ? '#f5a62366' : undefined,
+      warn: powerOnly ? `⚠ power-only — ${invGap} inverters not yet startable (${park.darkInvs.length} dark · ${park.noScbInvs} no SCB)` : null,
+      info: 'First date on which the projected mounted DC meets the minimum DC required to demonstrate the AC target that same day, under the active weather scenario. Reaching the daily peak is enough — it does not need to be sustained. This date covers the POWER condition only: ER3 additionally requires all 56 inverters started (≥1 mounted string behind an approved SCB each) — the amber note appears while any inverter is not yet startable.',
     },
     {
       label: 'DC REQUIRED TODAY', color: reqToday > TOTAL_MWDC ? '#ef4444' : '#f5a623',
@@ -587,12 +590,6 @@ export default function ReadinessTab() {
       sub: `${park.noScbInvs} with modules but no approved SCB · ${park.darkInvs.length} dark`,
       info: 'SG1100UD units with at least one mounted string behind an approved SCB. Start-up is a voltage condition, not power: one 30-module string gives 1,083 V at 60 °C, above the 905 V start threshold. "Dark" = units with no strings mounted at all, which cannot energise yet. ER3 requires ALL inverters started to verify reactive capability.',
     },
-    {
-      label: 'MVPS5 LOCK-IN', color: forcedAtCross === null ? '#666' : forcedAtCross > 0 ? '#f5a623' : '#4ade80',
-      val: forcedAtCross === null ? '—' : forcedAtCross > 0 ? `${forcedAtCross} strings` : 'none forced',
-      sub: `power forced into the ${park.darkInvs.length} dark inverters at target date (+1 string each just to start)`,
-      info: `The ${park.darkInvs.length} currently-dark inverters hold ${park.darkStrings} strings (${(park.darkStrings * STRING_KWP / 1000).toFixed(2)} MWdc). When the required DC exceeds what the rest of the park can supply (${((TOTAL_STRINGS - park.darkStrings) * STRING_KWP / 1000).toFixed(2)} MWdc), the difference must be mounted inside them — on top of the ≥1 string each needs anyway for ER3 start-up.`,
-    },
   ];
 
   const selBtn = (on, color = '#818cf8') => ({
@@ -616,14 +613,15 @@ export default function ReadinessTab() {
         </div>
 
         {/* KPI row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 9, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 9, marginBottom: 12 }}>
           {kpis.map((k) => (
-            <div key={k.label} style={{ ...card, textAlign: 'center' }}>
+            <div key={k.label} style={{ ...card, textAlign: 'center', ...(k.border ? { borderColor: k.border } : {}) }}>
               <div style={{ fontSize: 8, color: '#555', letterSpacing: 1, marginBottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {k.label}<Info text={k.info} />
               </div>
               <div style={{ fontSize: 17, fontWeight: 800, color: k.color, lineHeight: 1.1 }}>{k.val}</div>
               <div style={{ fontSize: 8, color: '#555', marginTop: 4 }}>{k.sub}</div>
+              {k.warn && <div style={{ fontSize: 8, color: '#f5a623', fontWeight: 700, marginTop: 4 }}>{k.warn}</div>}
             </div>
           ))}
         </div>
