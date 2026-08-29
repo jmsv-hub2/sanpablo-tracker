@@ -83,8 +83,9 @@ const SunPanel = memo(function SunPanel({ env, targetMW, projLookup, mountedMW }
 
   const setTime = (v) => { stateRef.current.t = v; setT(v); };
 
-  // geometry: x = solar time 5..19 → 40..620, y = elevation 0..90° → 250..30
-  const X = (tt) => 40 + (tt - 5) / 14 * 580;
+  // geometry: x = solar time 5..19 → 40..1160, y = elevation 0..90° → 250..30
+  // (panoramic 1200×300 viewBox so the panel stays short at full browser width)
+  const X = (tt) => 40 + (tt - 5) / 14 * 1120;
   const Y = (el) => 250 - Math.max(0, el) / 90 * 220;
   const arcFor = (n) => {
     const pts = [];
@@ -124,7 +125,7 @@ const SunPanel = memo(function SunPanel({ env, targetMW, projLookup, mountedMW }
   return (
     <div style={{ display: 'flex', gap: 12 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <svg viewBox="0 0 660 300" style={{ width: '100%', display: 'block', background: 'linear-gradient(#07070f 0%, #0c1024 55%, #11142a 84%, #0d0d18 84.5%)', borderRadius: 6 }}>
+        <svg viewBox="0 0 1200 300" style={{ width: '100%', display: 'block', background: 'linear-gradient(#07070f 0%, #0c1024 55%, #11142a 84%, #0d0d18 84.5%)', borderRadius: 6 }}>
           <defs>
             <radialGradient id="sunGlow">
               <stop offset="0%" stopColor="#f5a623" stopOpacity="0.85" />
@@ -134,8 +135,8 @@ const SunPanel = memo(function SunPanel({ env, targetMW, projLookup, mountedMW }
           </defs>
           {[15, 30, 45, 60, 75].map((el) => (
             <g key={el}>
-              <line x1={40} y1={Y(el)} x2={620} y2={Y(el)} stroke="#1e1e35" strokeWidth={0.6} strokeDasharray="3 5" />
-              <text x={628} y={Y(el) + 2.5} fontSize={7} fill="#3d3d55">{el}°</text>
+              <line x1={40} y1={Y(el)} x2={1160} y2={Y(el)} stroke="#1e1e35" strokeWidth={0.6} strokeDasharray="3 5" />
+              <text x={1168} y={Y(el) + 2.5} fontSize={7} fill="#3d3d55">{el}°</text>
             </g>
           ))}
           {/* ghost solstice arcs */}
@@ -146,8 +147,8 @@ const SunPanel = memo(function SunPanel({ env, targetMW, projLookup, mountedMW }
           {/* today's arc */}
           <polyline points={arc} fill="none" stroke="#f5a62388" strokeWidth={1.6} />
           {/* horizon + ground + array */}
-          <line x1={30} y1={250} x2={630} y2={250} stroke="#2d2d4a" strokeWidth={1.2} />
-          <g transform="translate(285,250)">
+          <line x1={30} y1={250} x2={1170} y2={250} stroke="#2d2d4a" strokeWidth={1.2} />
+          <g transform="translate(555,250)">
             {[0, 30, 60].map((dx) => (
               <polygon key={dx} points={`${dx},-1 ${dx + 22},-8 ${dx + 26},-6 ${dx + 4},1`} fill="#1e2a45" stroke="#818cf8" strokeWidth={0.7} />
             ))}
@@ -164,20 +165,20 @@ const SunPanel = memo(function SunPanel({ env, targetMW, projLookup, mountedMW }
             <text key={h} x={X(h)} y={262} fontSize={7.5} fill="#555" textAnchor="middle">{String(h).padStart(2, '0')}:00</text>
           ))}
           <text x={40} y={262} fontSize={7.5} fill="#3d3d55" textAnchor="end">E</text>
-          <text x={622} y={262} fontSize={7.5} fill="#3d3d55">W</text>
+          <text x={1162} y={262} fontSize={7.5} fill="#3d3d55">W</text>
         </svg>
         {/* output vs target strip */}
-        <svg viewBox="0 0 660 110" style={{ width: '100%', display: 'block', background: '#0d0d14', borderRadius: 6, marginTop: 6 }}>
+        <svg viewBox="0 0 1200 110" style={{ width: '100%', display: 'block', background: '#0d0d14', borderRadius: 6, marginTop: 6 }}>
           <path d={outPath + ` L${X(19)},96 L${X(5)},96 Z`} fill="#818cf826" />
           <path d={outPath} fill="none" stroke="#818cf8" strokeWidth={1.4} />
           {/* highlight above-target section */}
-          <clipPath id="aboveClip"><rect x={0} y={0} width={660} height={Math.max(0, OY(targetMW))} /></clipPath>
+          <clipPath id="aboveClip"><rect x={0} y={0} width={1200} height={Math.max(0, OY(targetMW))} /></clipPath>
           <path d={outPath} fill="none" stroke="#4ade80" strokeWidth={2} clipPath="url(#aboveClip)" />
-          <line x1={40} y1={OY(targetMW)} x2={620} y2={OY(targetMW)} stroke="#f5a623" strokeWidth={1} strokeDasharray="5 4" />
+          <line x1={40} y1={OY(targetMW)} x2={1160} y2={OY(targetMW)} stroke="#f5a623" strokeWidth={1} strokeDasharray="5 4" />
           <text x={44} y={OY(targetMW) - 4} fontSize={8} fill="#f5a623" fontWeight={700}>{targetMW} MWac target</text>
           {sunUp && <line x1={sx} y1={8} x2={sx} y2={100} stroke="#ffd16644" strokeWidth={1} />}
-          <text x={620} y={16} fontSize={8} fill="#555" textAnchor="end">plant output at {dcInstalled.toFixed(1)} MWdc installed</text>
-          <text x={620} y={104} fontSize={8} fill={mins > 0 ? '#4ade80' : '#ef4444'} textAnchor="end" fontWeight={700}>
+          <text x={1160} y={16} fontSize={8} fill="#555" textAnchor="end">plant output at {dcInstalled.toFixed(1)} MWdc installed</text>
+          <text x={1160} y={104} fontSize={8} fill={mins > 0 ? '#4ade80' : '#ef4444'} textAnchor="end" fontWeight={700}>
             {mins > 0 ? `${mins} min/day ≥ target` : 'never reaches target'}
           </text>
         </svg>
@@ -218,7 +219,7 @@ const MainChart = memo(function MainChart({ curves, activeKey, proj, crossing, t
   const ref = useRef(null);
   const days = curves[0].points;
   const N = days.length;
-  const W = 980, H = 300, L = 46, R = 934, T = 14, B = 272;
+  const W = 1200, H = 300, L = 46, R = 1154, T = 14, B = 272;
   const feasible = curves.flatMap((c) => c.points.map((p) => p.req)).filter((v) => v <= TOTAL_MWDC + 3);
   const lo = Math.min(...feasible, ...proj.map((p) => p.mw), TOTAL_MWDC);
   const hi = Math.min(Math.max(...feasible, TOTAL_MWDC) + 1.5, 78);
