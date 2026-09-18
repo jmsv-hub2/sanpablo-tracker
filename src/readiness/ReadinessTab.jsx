@@ -17,6 +17,33 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwJQNUg5oRFeUABFEf_QfPG
 const card = { background: '#12121f', border: '1px solid #1e1e35', borderRadius: 8, padding: '12px 14px' };
 const btn = { background: '#1a1a2e', border: '1px solid #2d2d4a', color: '#aaa', borderRadius: 4, padding: '3px 9px', cursor: 'pointer', fontSize: 9, fontWeight: 600 };
 const numIn = { width: 58, background: '#0d0d18', border: '1px solid #2d2d4a', color: '#ddd', borderRadius: 4, fontSize: 10, padding: '3px 5px', outline: 'none', textAlign: 'right' };
+
+// Integer input that keeps a text draft while editing (so it can be cleared and
+// retyped freely — no snapping to a default), commits on blur / Enter, reverts on
+// Escape, and selects all on focus so typing replaces the old number. Same pattern
+// as the editable target box in the Metrics tab.
+function DraftIntInput({ value, min = 1, onCommit, style }) {
+  const [draft, setDraft] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+  const cancelRef = useRef(false); // set by Escape so the blur that follows discards the draft
+  useEffect(() => { if (!editing) setDraft(String(value)); }, [value, editing]);
+  const commit = () => {
+    if (!cancelRef.current) {
+      const n = parseInt(String(draft).replace(',', '.'), 10);
+      if (!isNaN(n)) onCommit(Math.max(min, n));
+    }
+    cancelRef.current = false;
+    setEditing(false);
+  };
+  return (
+    <input type="text" inputMode="numeric" value={draft} style={style}
+      title="Type a value and press Enter (Esc to cancel)"
+      onFocus={(e) => { setEditing(true); const t = e.target; setTimeout(() => t.select(), 0); }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { cancelRef.current = true; setDraft(String(value)); e.target.blur(); } }} />
+  );
+}
 const infoDot = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 11, height: 11, borderRadius: '50%', border: '1px solid #3a3a55', color: '#666', fontSize: 8, fontWeight: 700, cursor: 'help', marginLeft: 4, lineHeight: 1, userSelect: 'none', flexShrink: 0 };
 const lbl = { fontSize: 8, color: '#555', letterSpacing: 0.5, marginBottom: 3, display: 'flex', alignItems: 'center' };
 const thS = { padding: '4px 8px', color: '#555', fontWeight: 600, fontSize: 8, letterSpacing: 0.5, background: '#12121f', position: 'sticky', top: 0, borderBottom: '1px solid #1e1e35', whiteSpace: 'nowrap' };
@@ -457,7 +484,7 @@ export default function ReadinessTab() {
   useEffect(() => { load(); }, [load]);
 
   // ── controls state ────────────────────────────────────────────────────────
-  const DEFAULT_EXEC = useMemo(() => ({ targetMW: 25, rate: 24, workdays: 6, startISO: toISO(todayNoon()), useProgress: true }), []);
+  const DEFAULT_EXEC = useMemo(() => ({ targetMW: 50, rate: 24, workdays: 6, startISO: toISO(todayNoon()), useProgress: true }), []);
   const [exec, setExec] = useState(DEFAULT_EXEC);
   const setE = (patch) => setExec((p) => ({ ...p, ...patch }));
   const [env, setEnv] = useState({ ...DEFAULT_ENV });
@@ -646,8 +673,7 @@ export default function ReadinessTab() {
               </div>
               <div>
                 <div style={lbl}>TABLES / DAY<Info text="Total mounting rate per workday. Observed on the tracker: ~24 tables per workday over the last 4 weeks (~140/week on 6-day weeks)." /></div>
-                <input type="number" min={1} step={1} value={rate} style={numIn}
-                  onChange={(e) => setE({ rate: Math.max(1, +e.target.value || 1) })} />
+                <DraftIntInput value={rate} min={1} style={numIn} onCommit={(v) => setE({ rate: v })} />
                 <span style={{ fontSize: 8, color: '#444', marginLeft: 6 }}>≈ {(rate * exec.workdays).toFixed(0)}/week</span>
               </div>
               <div>

@@ -314,6 +314,44 @@ function loadVreThresholds() {
   } catch(e) {}
   return base;
 }
+// ── Editable target for the Metrics "target reached" card ───────────────────
+// The field keeps its text as a draft string so it can be cleared and retyped
+// freely (no snapping while typing); the value is committed on blur / Enter and
+// reverted on Escape. Select-all on focus so typing replaces the old number.
+// Accepts "," or "." as decimal separator. Unit toggle: % of park or MWp.
+function TargetEditor({ pct, onChange }) {
+  const [unit, setUnit] = useState("pct"); // "pct" | "mwp"
+  const [editing, setEditing] = useState(false);
+  const shown = unit === "pct" ? pct : pct / 100 * TOTAL_MWP;
+  const fmt = v => unit === "pct" ? String(Math.round(v * 10) / 10) : v.toFixed(2);
+  const [draft, setDraft] = useState(() => fmt(shown));
+  const cancelRef = useRef(false); // set by Escape so the blur that follows discards the draft
+  useEffect(() => { if (!editing) setDraft(fmt(shown)); }, [pct, unit, editing]);
+  const commit = () => {
+    if (!cancelRef.current) {
+      const n = parseFloat(String(draft).replace(",", "."));
+      if (!isNaN(n)) {
+        const p = unit === "pct" ? n : n / TOTAL_MWP * 100;
+        onChange(Math.round(Math.max(1, Math.min(100, p)) * 10) / 10);
+      }
+    }
+    cancelRef.current = false;
+    setEditing(false);
+  };
+  const btn = on => ({ background: on ? "#818cf8" : "#0d0d1a", border: `1px solid ${on ? "#818cf8" : "#1e1e35"}`, color: on ? "#000" : "#888", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontSize: 9, fontWeight: 700 });
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <input type="text" inputMode="decimal" value={draft} title="Type a value and press Enter (Esc to cancel)"
+        onFocus={e => { setEditing(true); const t = e.target; setTimeout(() => t.select(), 0); }}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { cancelRef.current = true; setDraft(fmt(shown)); e.target.blur(); } }}
+        style={{ width: 62, background: "#0d0d1a", border: "1px solid #1e1e35", color: "#e0e0e8", borderRadius: 4, padding: "3px 6px", fontSize: 12, fontWeight: 700, textAlign: "right", outline: "none", fontVariantNumeric: "tabular-nums" }} />
+      <button onClick={() => setUnit("pct")} style={btn(unit === "pct")}>%</button>
+      <button onClick={() => setUnit("mwp")} style={btn(unit === "mwp")}>MWp</button>
+    </div>
+  );
+}
 export default function SolarPark() {
   const canEdit = useMemo(() => {
     try {
@@ -331,6 +369,7 @@ export default function SolarPark() {
   const [subs, setSubs]     = useState([]);
   const [phaseColors, setPhaseColors] = useState(DEFAULT_COLORS);
   const [vreThresholds, setVreThresholds] = useState(loadVreThresholds);
+  const [targetPct, setTargetPct] = useState(90); // Metrics "target" card only — session state, default 90%
   useEffect(() => { try { localStorage.setItem(VRE_LS_KEY, JSON.stringify(vreThresholds)); } catch(e) {} }, [vreThresholds]);
   const PHASES = useMemo(() => makePhases(phaseColors), [phaseColors]);
   const [loaded, setLoaded] = useState(false);
@@ -1948,8 +1987,9 @@ export default function SolarPark() {
               {(()=>{
                 const msExec = msDone + msPendingInsp;
                 const pvExec = pvDone + pvPendingInsp;
-                const ms80Target = Math.ceil(T*0.8);
-                const pv80Target = MILESTONE_TABLES;
+                const tgtTables  = Math.ceil(T*targetPct/100); // editable target — this card only (MILESTONE_TABLES untouched elsewhere)
+                const ms80Target = tgtTables;
+                const pv80Target = tgtTables;
                 const msTo80  = Math.max(0, ms80Target - msExec);
                 const msTo100 = Math.max(0, T - msExec);
                 const pvTo80  = Math.max(0, pv80Target - pvExec);
@@ -1974,8 +2014,17 @@ export default function SolarPark() {
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                     {/* 80% card */}
                     <div style={{background: reached80ms&&reached80pv?"#0a1a0a":"#0d0d1a", border:`1px solid ${reached80ms&&reached80pv?"#22c55e44":"#1e1e35"}`,borderRadius:8,padding:"14px 16px"}}>
-                      <div style={{fontSize:10,color:reached80ms&&reached80pv?"#22c55e":"#fb923c",fontWeight:700,letterSpacing:1,marginBottom:10}}>
-                        {reached80ms&&reached80pv?"✓ 80% TARGET REACHED":"🎯 TO REACH 80% TARGET"}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                        <div style={{fontSize:10,color:reached80ms&&reached80pv?"#22c55e":"#fb923c",fontWeight:700,letterSpacing:1}}>
+                          {reached80ms&&reached80pv?`✓ ${targetPct}% TARGET REACHED`:`🎯 TO REACH ${targetPct}% TARGET`}
+                          <span style={{color:"#555",fontWeight:400,letterSpacing:0,marginLeft:8}}>{(tgtTables*mwpPerTable).toFixed(2)} MWp · {tgtTables.toLocaleString()} tables</span>
+                        </div>
+                        <TargetEditor pct={targetPct} onChange={setTargetPct}/>
+                      </div>
+                      <div style={{fontSize:10,color:"#888",marginBottom:10}}>
+                        Currently at: <span style={{color:phaseColors.ms,fontWeight:700}}>MS {(msExec/T*100).toFixed(1)}%</span>
+                        <span style={{color:"#444"}}> · </span>
+                        <span style={{color:phaseColors.pv,fontWeight:700}}>PV {(pvExec/T*100).toFixed(1)}%</span>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
                         <div style={{background:"#12121f",borderRadius:6,padding:"10px 12px",textAlign:"center"}}>
