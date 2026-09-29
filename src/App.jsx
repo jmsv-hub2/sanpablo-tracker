@@ -179,12 +179,31 @@ ${head}${body}
 // value = what's actually stored per SCB id (unchanged from before for 0/1/2, so
 // existing data keeps its original meaning); countMode controls how the legend
 // tallies that row without touching the pre-existing count formulas.
+// Array order is the workflow order; "cumulative" rows count every SCB at or
+// past that step. Value 2 was "Fully wired" (never used) and now means
+// Energized = every string of the box connected; 4 = Tested comes after.
 const SCB_STATUS = [
   { label: "Not started",           value: 0, color: "#ffffff", outline: true, countMode: "exact" },
-  { label: "SCB pending inspection",value: 1, color: "#ef4444", countMode: "exact" },
-  { label: "SCB approved",          value: 3, color: "#f5c518", countMode: "cumulative-approved" },
-  { label: "Fully wired",           value: 2, color: "#4ade80", countMode: "exact" },
+  { label: "Installed · pending inspection", value: 1, color: "#ef4444", countMode: "exact" },
+  { label: "Approved",              value: 3, color: "#f5c518", countMode: "cumulative" },
+  { label: "Energized",             value: 2, color: "#4ade80", countMode: "cumulative" },
+  { label: "Tested",                value: 4, color: "#e879f9", countMode: "exact" },
 ];
+// Workflow position of a stored value (0 Not started … 4 Tested).
+const SCB_RANK = { INSTALLED: 1, APPROVED: 2, ENERGIZED: 3, TESTED: 4 };
+function scbRank(v) { const i = SCB_STATUS.findIndex(s => s.value === (v||0)); return i < 0 ? 0 : i; }
+// SCBs with all DC strings executed as of the "DC STRING PER SCB" list
+// (Sep 2026). Imported once as Energized; only applied while no SCB is
+// energized yet, so after the first save it never runs again.
+const DC_STRINGS_SEED = ["1A-01","1A-02","1A-03","1A-04","1A-05","1B-06","1B-07","1B-08","1B-09","1B-10","1C-11","1D-16","1D-17","1D-18","1D-19","1C-13","1C-14","1C-15","8A-02","8A-03","8A-04","9B-08","9C-09","9C-10","9C-11","9C-12","9D-13","9D-14","9D-15","2A-01","2A-02","2A-03","2A-04","2B-05","2B-06","2B-07","2B-08","2C-09","2C-11","2C-12","2D-13","2D-14","2D-15","2D-16","2E-17","2E-18","2E-19","2E-20","2F-21","2F-22","2F-23","2F-24","2G-25","2G-26","2G-27","2G-28","2H-29","2H-30","2H-31","2H-32"];
+function applyDcStringsSeed(st) {
+  if (Object.values(st).some(v => scbRank(v) >= SCB_RANK.ENERGIZED)) return st;
+  const next = { ...st };
+  DC_STRINGS_SEED.forEach(id => { if (scbRank(next[id]) < SCB_RANK.ENERGIZED) next[id] = 2; });
+  return next;
+}
+// Subcontractor UI is hidden (tab, map layer, metrics card); code and data kept.
+const SHOW_SUBCONS = false;
 function scbStatusEntry(v) { return SCB_STATUS.find(s => s.value === (v||0)) || SCB_STATUS[0]; }
 function nextScbStatus(v) {
   const idx = SCB_STATUS.findIndex(s => s.value === (v||0));
@@ -369,7 +388,11 @@ export default function SolarPark() {
   const [subs, setSubs]     = useState([]);
   const [phaseColors, setPhaseColors] = useState(DEFAULT_COLORS);
   const [vreThresholds, setVreThresholds] = useState(loadVreThresholds);
-  const [targetPct, setTargetPct] = useState(90); // Metrics "target" card only — session state, default 90%
+  // Metrics "target" card + Map milestone; default 90%, remembered per browser (localStorage only).
+  const [targetPct, setTargetPct] = useState(() => {
+    try { const v = parseFloat(localStorage.getItem('sp_target_pct')); return v > 0 && v <= 100 ? v : 90; } catch(e) { return 90; }
+  });
+  useEffect(() => { try { localStorage.setItem('sp_target_pct', String(targetPct)); } catch(e) {} }, [targetPct]);
   useEffect(() => { try { localStorage.setItem(VRE_LS_KEY, JSON.stringify(vreThresholds)); } catch(e) {} }, [vreThresholds]);
   const PHASES = useMemo(() => makePhases(phaseColors), [phaseColors]);
   const [loaded, setLoaded] = useState(false);
@@ -403,6 +426,19 @@ export default function SolarPark() {
   const [scbStatus, setScbStatus]         = useState({});
   const [hoveredScb, setHoveredScb]       = useState(null);
   const [scbTooltip, setScbTooltip]       = useState(null);
+  const [scbCtx, setScbCtx]               = useState(null); // SCB right-click status menu
+  const [scbStatusFilter, setScbStatusFilter] = useState(new Set()); // highlight SCB squares by status
+  const [borderEnergized, setBorderEnergized] = useState(false); // table borders: energized SCBs
+  const [borderTested, setBorderTested]       = useState(false); // table borders: tested SCBs
+  // Legend highlight: cumulative rows match that step and anything past it.
+  const scbPassesFilter = useCallback((v) => {
+    if (!scbStatusFilter.size) return true;
+    const r = scbRank(v);
+    return [...scbStatusFilter].some(fv => {
+      const fr = scbRank(fv);
+      return SCB_STATUS[fr].countMode === "cumulative" ? r >= fr : r === fr;
+    });
+  }, [scbStatusFilter]);
   const [scbTabHover, setScbTabHover]     = useState(null); // SCB tab map hover (read-only)
   const [scbTabMvps, setScbTabMvps]       = useState(null); // SCB tab MVPS filter
   const [scbSort, setScbSort]             = useState({ key:"missing", dir:"asc" });
@@ -505,6 +541,9 @@ export default function SolarPark() {
     setCollapseMvps(true);
     setShowScb(false);
     setCollapseScb(true);
+    setScbStatusFilter(new Set());
+    setBorderEnergized(false);
+    setBorderTested(false);
     setBf(new Set());
     setPf(new Set());
     setPaintMode(false);
@@ -533,7 +572,7 @@ export default function SolarPark() {
               color: s.color || colorMap[s.id] || s.color,
             })));
           }
-          setScbStatus(sheetsData.scbStatus || {});
+          setScbStatus(applyDcStringsSeed(sheetsData.scbStatus || {}));
           configLoadedOk.current = true;
         }
         if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
@@ -626,8 +665,10 @@ export default function SolarPark() {
   const pvExecuted    = useMemo(() => TABLES.filter(t => (phases?.[t.id]||0) >= 5).length, [phases]); 
   const mwp  = ((pvDone*30*615)/1e6).toFixed(2);
   const pct  = (pvDone/total*100).toFixed(1);
-  const milestoneReached = pvExecuted >= MILESTONE_TABLES;
-  const milestonePct = Math.min(pvExecuted/(MILESTONE_TABLES||1)*100, 100).toFixed(1);
+  // Map milestone follows the editable target in Metrics ("to reach X% target"), PV executed basis.
+  const pvTargetTables = Math.ceil(TABLES.length*targetPct/100);
+  const milestoneReached = pvExecuted >= pvTargetTables;
+  const milestonePct = Math.min(pvExecuted/(pvTargetTables||1)*100, 100).toFixed(1);
   // ── SCB readiness (read-only analytics for the SCB tab) ──────────────────
   // An SCB is "complete" when every table it feeds has its panels mounted
   // (phase >= 5, i.e. pvExecuted's definition — inspected or not). This is
@@ -963,6 +1004,7 @@ export default function SolarPark() {
     };
   }); 
   useEffect(() => { const h=()=>setCtx(null); window.addEventListener("click",h); return ()=>window.removeEventListener("click",h); }, []);
+  useEffect(() => { const h=()=>setScbCtx(null); window.addEventListener("click",h); return ()=>window.removeEventListener("click",h); }, []);
   const hulls = useMemo(() => {
     const PAD = 2.5;
     const result = {}, centroids = {};
@@ -1071,7 +1113,7 @@ export default function SolarPark() {
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:15,fontWeight:800,color:"#f5a623"}}>☀ San Pablo Solar — 65 MWp</span>
           <span style={{fontSize:10,color:"#555",background:"#1a1a2e",padding:"2px 7px",borderRadius:4}}>3,524 tables · Isabela, PH</span>
-          {milestoneReached && <span style={{fontSize:10,background:"#0d2010",color:"#22c55e",border:"1px solid #22c55e55",padding:"2px 8px",borderRadius:10,fontWeight:700}}>🏆 80% PV Milestone reached!</span>}
+          {milestoneReached && <span style={{fontSize:10,background:"#0d2010",color:"#22c55e",border:"1px solid #22c55e55",padding:"2px 8px",borderRadius:10,fontWeight:700}}>🏆 {targetPct}% PV Milestone reached!</span>}
         </div>
         <div style={{display:"flex",gap:12,alignItems:"center"}}>
           {[{l:"SP",app:spDone,exe:spExecuted,c:phaseColors.sp},{l:"MS",app:msDone,exe:msExecuted,c:phaseColors.ms},{l:"PV",app:pvDone,exe:pvExecuted,c:phaseColors.pv}].map(s=>(
@@ -1113,7 +1155,7 @@ export default function SolarPark() {
             </button>
           </div>
           <div style={{display:"flex",gap:1,background:"#0d0d14",borderRadius:5,padding:2,marginLeft:4}}>
-            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"],["scb","🔌 SCB"],["readiness","🎯 Minimum DC"]].map(([t,l])=>(
+            {[["map","🔆 Map"],["subs","👷 Subs"],["metrics","📊 Metrics"],["scb","🔌 SCB"],["readiness","🎯 Minimum DC"]].filter(([t])=>SHOW_SUBCONS||t!=="subs").map(([t,l])=>(
               <button key={t} onClick={()=>{ setTab(t); if(t==="map") setTimeout(fitToScreen,50); }}
                 style={{background:tab===t?"#818cf8":"#1a1a2e",border:`1px solid ${tab===t?"#818cf8":"#2d2d4a"}`,color:tab===t?"#000":"#888",borderRadius:5,padding:"5px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===t?700:500,letterSpacing:0.3,transition:"all .15s"}}>{l}</button>
             ))}
@@ -1122,15 +1164,15 @@ export default function SolarPark() {
       </div>
       {tab==="map" && (
         <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-          <div style={{width:210,background:"#0f0f1c",borderRight:"1px solid #1e1e35",overflowY:"auto",flexShrink:0,padding:"8px 7px"}}>
+          <div className="sp-sidebar" style={{width:240,background:"#0f0f1c",borderRight:"1px solid #1e1e35",overflowY:"auto",flexShrink:0,padding:"8px 7px"}}>
             <div style={{marginBottom:8,padding:"7px 8px",background:milestoneReached?"#0d2010":"#0d0d1a",borderRadius:5,border:`1px solid ${milestoneReached?"#22c55e44":"#1e1e35"}`}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:milestoneReached?"#22c55e":"#666",marginBottom:3,fontWeight:700}}>
-                <span>🏆 80% PV Target</span><span>{milestoneReached?"✓ DONE":milestonePct+"%"}</span>
+                <span>🏆 {targetPct}% PV Target</span><span>{milestoneReached?"✓ DONE":milestonePct+"%"}</span>
               </div>
               <div style={{height:5,background:"#1a1a2e",borderRadius:3,overflow:"hidden"}}>
                 <div style={{height:"100%",width:milestonePct+"%",background:milestoneReached?"#2563eb":"#fb923c",borderRadius:3,transition:"width .3s"}}/>
               </div>
-              <div style={{fontSize:8,color:"#555",marginTop:2}}>Target: {MILESTONE_MWP} MWp ({MILESTONE_TABLES} tables)</div>
+              <div style={{fontSize:8,color:"#555",marginTop:2}}>Target: {(pvTargetTables*30*615/1e6).toFixed(2)} MWp ({pvTargetTables} tables) · editable in Metrics</div>
             </div>
             <div style={{marginBottom:8}}>
               <div style={{fontSize:9,color:"#666",letterSpacing:1,marginBottom:4}}>PROGRESS</div>
@@ -1248,7 +1290,7 @@ export default function SolarPark() {
               </>}
             </div>
             {/* ── SUBCONS ── */}
-            {subs.length > 0 && <>
+            {SHOW_SUBCONS && subs.length > 0 && <>
               <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
               <div style={{marginBottom:2}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",cursor:"pointer"}}
@@ -1401,13 +1443,17 @@ export default function SolarPark() {
               </div>
               {!collapseScb && <>
                 {SCB_STATUS.map((st,si)=>{
-                  const n = st.countMode==="cumulative" ? SCB_LIST.filter(s=>(scbStatus[s.id]||0)>=1).length
-                    : st.countMode==="cumulative-approved" ? SCB_LIST.filter(s=>{const v=scbStatus[s.id]||0; return v===3||v===2;}).length
+                  const n = st.countMode==="cumulative" ? SCB_LIST.filter(s=>scbRank(scbStatus[s.id])>=si).length
                     : SCB_LIST.filter(s=>(scbStatus[s.id]||0)===st.value).length;
                   const total = SCB_LIST.length;
                   const pct = (n/total*100).toFixed(0);
+                  const on = scbStatusFilter.has(st.value);
+                  const faded = scbStatusFilter.size>0 && !on;
                   return (
-                    <div key={si} style={{display:"flex",alignItems:"center",gap:7,padding:"2px 4px",marginBottom:1}}>
+                    <div key={si} onClick={()=>setScbStatusFilter(prev=>{ const n=new Set(prev); n.has(st.value)?n.delete(st.value):n.add(st.value); return n; })}
+                      title={`Highlight SCBs ${st.countMode==="cumulative"?"at or past":"in"} "${st.label}" on the map`}
+                      style={{display:"flex",alignItems:"center",gap:7,padding:"2px 4px",marginBottom:1,cursor:"pointer",borderRadius:3,
+                        background:on?"#1e1e35":"transparent",opacity:faded?0.45:1}}>
                       <div style={{width:9,height:9,borderRadius:2,flexShrink:0,
                         background:st.outline?"transparent":st.color,
                         border:st.outline?`1px solid ${st.color}`:"none"}}/>
@@ -1417,6 +1463,26 @@ export default function SolarPark() {
                     </div>
                   );
                 })}
+                {scbStatusFilter.size>0 && (
+                  <div onClick={()=>setScbStatusFilter(new Set())}
+                    style={{fontSize:8,color:"#666",padding:"1px 4px",cursor:"pointer",textAlign:"right"}}>✕ clear highlight</div>
+                )}
+                <div style={{height:1,background:"#1e1e35",margin:"4px 0 6px"}}/>
+                <div style={{fontSize:9,color:"#888",fontWeight:600,padding:"0 4px 3px"}}>Table borders (strings connected)</div>
+                <div style={{display:"flex",gap:4,padding:"0 4px 2px"}}>
+                  {[
+                    {k:"en", label:"Energized", st:SCB_STATUS[SCB_RANK.ENERGIZED], on:borderEnergized, set:setBorderEnergized,
+                      tip:"Outline every table whose SCB is Energized or Tested (its string is connected)"},
+                    {k:"te", label:"Tested", st:SCB_STATUS[SCB_RANK.TESTED], on:borderTested, set:setBorderTested,
+                      tip:"Outline every table whose SCB is Tested"},
+                  ].map(b=>(
+                    <button key={b.k} onClick={()=>b.set(v=>!v)} title={b.tip}
+                      style={{flex:1,background:b.on?b.st.color:"#1e1e35",border:`1px solid ${b.on?b.st.color:"#2d2d4a"}`,
+                        color:b.on?"#000":"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                      {b.label} {b.on?"ON":"OFF"}
+                    </button>
+                  ))}
+                </div>
                 <div style={{height:1,background:"#1e1e35",margin:"4px 0 6px"}}/>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 4px",cursor:"pointer"}}
                   onClick={()=>setCollapseScbMvps(s=>!s)}>
@@ -1426,20 +1492,23 @@ export default function SolarPark() {
                   <div style={{display:"flex",alignItems:"center",gap:5,padding:"1px 4px",marginBottom:1}}>
                     <div style={{width:18,flexShrink:0}}/>
                     <span style={{flex:1}}/>
-                    <span style={{fontSize:7,color:"#f5c518",width:34,textAlign:"center",flexShrink:0}}>inst.</span>
-                    <span style={{fontSize:7,color:"#4ade80",width:34,textAlign:"center",flexShrink:0}}>wired</span>
+                    <span style={{fontSize:7,color:"#f5c518",width:30,textAlign:"center",flexShrink:0}}>inst.</span>
+                    <span style={{fontSize:7,color:"#4ade80",width:30,textAlign:"center",flexShrink:0}}>energ.</span>
+                    <span style={{fontSize:7,color:"#e879f9",width:30,textAlign:"center",flexShrink:0}}>tested</span>
                   </div>
                   {[1,2,3,4,5,6,7,8,9,10,11].map(mv=>{
                     const list = SCB_LIST.filter(s=>scbMvps(s.id)===mv);
                     if (!list.length) return null;
-                    const installed = list.filter(s=>(scbStatus[s.id]||0)>=1).length;
-                    const wired = list.filter(s=>(scbStatus[s.id]||0)===2).length;
+                    const installed = list.filter(s=>scbRank(scbStatus[s.id])>=SCB_RANK.INSTALLED).length;
+                    const energized = list.filter(s=>scbRank(scbStatus[s.id])>=SCB_RANK.ENERGIZED).length;
+                    const tested = list.filter(s=>scbRank(scbStatus[s.id])>=SCB_RANK.TESTED).length;
                     return (
                       <div key={mv} style={{display:"flex",alignItems:"center",gap:5,padding:"2px 4px",marginBottom:1}}>
                         <div style={{width:18,height:8,borderRadius:2,background:BC[mv],flexShrink:0,border:`1px solid ${BC[mv]}88`}}/>
                         <span style={{flex:1,fontSize:9,color:"#ccc"}}>MVPS {mv}</span>
-                        <span style={{fontSize:8,color:installed===list.length?"#f5c518":"#665e2f",width:34,textAlign:"center",flexShrink:0}}>{installed}/{list.length}</span>
-                        <span style={{fontSize:8,color:wired===list.length?"#4ade80":"#2f6650",width:34,textAlign:"center",flexShrink:0}}>{wired}/{list.length}</span>
+                        <span style={{fontSize:8,color:installed===list.length?"#f5c518":"#665e2f",width:30,textAlign:"center",flexShrink:0}}>{installed}/{list.length}</span>
+                        <span style={{fontSize:8,color:energized===list.length?"#4ade80":energized?"#3f9e6a":"#2f6650",width:30,textAlign:"center",flexShrink:0}}>{energized}/{list.length}</span>
+                        <span style={{fontSize:8,color:tested===list.length?"#e879f9":tested?"#a3569f":"#5a3358",width:30,textAlign:"center",flexShrink:0}}>{tested}/{list.length}</span>
                       </div>
                     );
                   })}
@@ -1457,7 +1526,8 @@ export default function SolarPark() {
               🖱 Right-click = phase menu<br/>
               🔍 Scroll = zoom · ✋ Drag<br/>
               ⬚ Shift+drag: area select<br/>
-              🖱 Ctrl+click: multiselection
+              🖱 Ctrl+click: multiselection<br/>
+              🖱 Right-click SCB = status menu
             </div>
           </div>
           <div ref={canvasRef} style={{flex:1,overflow:"hidden",position:"relative",cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"grab"):"default"}}>
@@ -1474,7 +1544,7 @@ export default function SolarPark() {
                   const status = scbStatus[s.id]||0;
                   const entry = scbStatusEntry(status);
                   const col = entry.color;
-                  const dim = bf.size>0 && !bf.has(scbMvps(s.id));
+                  const dim = (bf.size>0 && !bf.has(scbMvps(s.id))) || !scbPassesFilter(status);
                   const hovered = hoveredScb===s.id;
                   return (
                     <rect key={`scb-${s.id}`} x={s.x-1} y={s.y-1} width={2} height={2} rx={0.3}
@@ -1485,7 +1555,8 @@ export default function SolarPark() {
                       onMouseEnter={e=>{ setHoveredScb(s.id); setScbTooltip({id:s.id, mv:scbMvps(s.id), strings:scbStringCount[s.id]||0, status:entry, x:e.clientX, y:e.clientY}); }}
                       onMouseMove={e=>setScbTooltip(t=>t?{...t, x:e.clientX, y:e.clientY}:t)}
                       onMouseLeave={()=>{ setHoveredScb(null); setScbTooltip(null); }}
-                      onClick={e=>{ e.stopPropagation(); if(!canEdit){showToast();return;} setScbStatus(prev=>({ ...prev, [s.id]: nextScbStatus(prev[s.id]||0) })); }}/>
+                      onClick={e=>{ e.stopPropagation(); if(!canEdit){showToast();return;} setScbStatus(prev=>({ ...prev, [s.id]: nextScbStatus(prev[s.id]||0) })); }}
+                      onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); if(!canEdit){showToast();return;} setCtx(null); setScbTooltip(null); setScbCtx({id:s.id, x:e.clientX, y:e.clientY}); }}/>
                   );
                 })}
                 {TABLES.map(t=>{
@@ -1511,6 +1582,12 @@ export default function SolarPark() {
                   const opacity = 1;
                   const hasDualSub = subconPV[t.id] && subconMS[t.id] && subconPV[t.id] !== subconMS[t.id];
                   const scbHighlight = showScb && hoveredScb && t.scb === hoveredScb;
+                  // String-connected outline (layer toggles in the SCB section; off by default)
+                  const scbR = (borderEnergized || borderTested) && t.scb ? scbRank(scbStatus[t.scb]) : 0;
+                  const stringBorder = (bf.size>0 && !bf.has(t.m)) ? null
+                    : borderTested && scbR>=SCB_RANK.TESTED ? SCB_STATUS[SCB_RANK.TESTED].color
+                    : borderEnergized && scbR>=SCB_RANK.ENERGIZED ? SCB_STATUS[SCB_RANK.ENERGIZED].color
+                    : null;
                   const tx = t.x+ROX, ty = t.y+ROY;
                   return (
                     <g key={t.id}
@@ -1523,8 +1600,8 @@ export default function SolarPark() {
                         x={tx} y={ty} width={RW} height={RH} rx={0.5}
                         fill={eggColor || fillColor}
                         fillOpacity={eggColor ? 1 : fillOpacity}
-                        stroke={scbHighlight ? "#ffffff" : strokeColor}
-                        strokeWidth={scbHighlight ? 0.5 : strokeW}/>
+                        stroke={scbHighlight ? "#ffffff" : stringBorder || strokeColor}
+                        strokeWidth={scbHighlight ? 0.5 : stringBorder ? 0.8 : strokeW}/>
                       {scbHighlight && (
                         <rect x={tx-0.6} y={ty-0.6} width={RW+1.2} height={RH+1.2} rx={0.8}
                           fill="none" stroke="#ffffff" strokeWidth={0.2} strokeOpacity={0.6}
@@ -1593,7 +1670,13 @@ export default function SolarPark() {
                 <div style={{fontWeight:700,color:"#fff"}}>{tooltip.id}</div>
                 <div style={{color:"#aaa",marginTop:1}}>MVPS {tooltip.mv} · {tooltip.ph}</div>
                 <div style={{color:"#666",fontSize:10,marginTop:1}}>30 panels · 18.45 kWp</div>
-                {subColorMap[tooltip.id] && (() => {
+                {(() => {
+                  const scb = TABLES.find(t=>t.id===tooltip.id)?.scb;
+                  if (!scb) return null;
+                  const st = scbStatusEntry(scbStatus[scb]);
+                  return <div style={{fontSize:9,marginTop:2,color:"#888"}}>SCB {scb} · <span style={{color:st.color}}>{st.label}</span></div>;
+                })()}
+                {SHOW_SUBCONS && subColorMap[tooltip.id] && (() => {
                   const msName = subconMS[tooltip.id] || subs.find(s=>s.tables.includes(tooltip.id))?.name;
                   const pvName = subconPV[tooltip.id];
                   const hasDual = pvName && msName && pvName !== msName;
@@ -1915,6 +1998,17 @@ export default function SolarPark() {
         const spInstalledScrewpiles = spApp * SP_PER_TABLE;
         const spPendingScrewpiles = spPend * SP_PER_TABLE;
         const spRemainingScrew = spTotalScrewpiles - spInstalledScrewpiles - spPendingScrewpiles;
+        // SCB / DC strings funnel: 1 table = 1 string, MWp = strings × 18.45 kWp
+        const scbItems = scbReadiness.items;
+        const scbStep = (r) => {
+          const list = scbItems.filter(s => scbRank(s.wiring) >= r);
+          const strings = list.reduce((a,s)=>a+s.total,0);
+          return { n:list.length, strings, mwp:strings*mwpPerTable };
+        };
+        const scbInstalled = scbStep(SCB_RANK.INSTALLED), scbApproved = scbStep(SCB_RANK.APPROVED);
+        const scbEnergized = scbStep(SCB_RANK.ENERGIZED), scbTested = scbStep(SCB_RANK.TESTED);
+        const scbTotal = scbItems.length;
+        const scbIncons = scbItems.filter(s => scbRank(s.wiring) >= SCB_RANK.ENERGIZED && !s.complete);
         const Card = ({title, children, accent="#f87171"}) => (
           <div style={{background:"#12121f",border:`1px solid ${accent}22`,borderRadius:8,padding:"14px 16px",marginBottom:0}}>
             <div style={{fontSize:10,color:accent,fontWeight:700,letterSpacing:1,marginBottom:10}}>{title}</div>
@@ -1939,13 +2033,15 @@ export default function SolarPark() {
           <div style={{flex:1,overflow:"auto",padding:20,background:"#0d0d14"}}>
             <div style={{maxWidth:920,margin:"0 auto"}}>
               <h2 style={{margin:"0 0 16px",fontSize:18,fontWeight:800,color:"#e0e0e8"}}>📊 Project Metrics</h2>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
                 {[
                   {label:"Total capacity",  val:`${TOTAL_MWP.toFixed(2)} MWp`, sub:`${T.toLocaleString()} tables`,  color:"#888"},
                   {label:"PV installed (executed)",    val:`${(pvExecuted*mwpPerTable).toFixed(2)} MWp`,    sub:`${pvExecuted} tables`,               color:phaseColors.pv},
                   {label:"Remaining",       val:`${(TOTAL_MWP-pvExecuted*mwpPerTable).toFixed(2)} MWp`, sub:`${T-pvExecuted} tables`, color:phaseColors.sp},
+                  {label:"Tested · ready to generate", val:`${scbTested.mwp.toFixed(2)} MWp`, sub:`${scbTested.n} SCBs · ${scbTested.strings.toLocaleString()} strings`, color:SCB_STATUS[SCB_RANK.TESTED].color, hero:true},
                 ].map(k=>(
-                  <div key={k.label} style={{background:"#12121f",border:"1px solid #1e1e35",borderRadius:8,padding:"12px 14px",textAlign:"center"}}>
+                  <div key={k.label} title={k.hero?"Installed and tested SCBs: the DC capacity that can generate as soon as the plant is energized":undefined}
+                    style={{background:k.hero?"#1a1224":"#12121f",border:`1px solid ${k.hero?k.color+"66":"#1e1e35"}`,borderRadius:8,padding:"12px 14px",textAlign:"center"}}>
                     <div style={{fontSize:9,color:"#555",letterSpacing:1,marginBottom:4}}>{k.label.toUpperCase()}</div>
                     <div style={{fontSize:18,fontWeight:800,color:k.color}}>{k.val}</div>
                     <div style={{fontSize:10,color:"#666",marginTop:2}}>{k.sub}</div>
@@ -1981,6 +2077,102 @@ export default function SolarPark() {
                   <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
                   <Row label="Total approved MWp" val={`${(pvApp*mwpPerTable).toFixed(2)}`} sub="MWp"/>
                   <Row label="Total pending inspection" val={pvPend} sub={`${(pvPend/T*100).toFixed(1)}%`}/>
+                </Card>
+              </div>
+              {/* ── SCBs & DC strings ── */}
+              <div style={{marginBottom:12}}>
+                <Card title="🔌 SCBs & DC STRINGS" accent="#4ade80">
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1.35fr",gap:18}}>
+                    <div>
+                      <div style={{display:"flex",justifyContent:"flex-end",gap:10,fontSize:8,color:"#555",marginBottom:4}}>
+                        <span>SCBs</span><span style={{width:62,textAlign:"right"}}>strings</span><span style={{width:56,textAlign:"right"}}>MWp</span>
+                      </div>
+                      {[
+                        {label:"Installed", d:scbInstalled, st:SCB_STATUS[SCB_RANK.INSTALLED], tip:"SCBs physically installed (pending inspection or later)"},
+                        {label:"Approved", d:scbApproved, st:SCB_STATUS[SCB_RANK.APPROVED], tip:"SCBs that passed inspection (or later)"},
+                        {label:"Energized", d:scbEnergized, st:SCB_STATUS[SCB_RANK.ENERGIZED], tip:"Every string of the SCB connected to the combiner box (or later)"},
+                        {label:"Tested", d:scbTested, st:SCB_STATUS[SCB_RANK.TESTED], tip:"Energized and tests completed: ready to generate"},
+                      ].map(r=>(
+                        <div key={r.label} title={r.tip} style={{marginBottom:8}}>
+                          <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:2}}>
+                            <span style={{flex:1,fontSize:11,color:"#ccc"}}>
+                              <span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:r.st.color,marginRight:6}}/>{r.label}
+                            </span>
+                            <span style={{fontSize:12,fontWeight:700,color:"#fff"}}>{r.d.n}<span style={{fontSize:9,color:"#555",fontWeight:400}}>/{scbTotal}</span></span>
+                            <span style={{fontSize:10,color:"#888",width:62,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{r.d.strings.toLocaleString()}</span>
+                            <span style={{fontSize:11,color:r.st.color,fontWeight:700,width:56,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{r.d.mwp.toFixed(2)}</span>
+                          </div>
+                          <div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:(r.d.n/(scbTotal||1)*100)+"%",background:r.st.color,borderRadius:2}}/>
+                          </div>
+                          <div style={{fontSize:8,color:"#555",marginTop:1,textAlign:"right"}}>
+                            {(r.d.n/(scbTotal||1)*100).toFixed(1)}% of SCBs · {(r.d.strings/T*100).toFixed(1)}% of strings
+                          </div>
+                        </div>
+                      ))}
+                      <div style={{height:1,background:"#1e1e35",margin:"8px 0"}}/>
+                      <Row label="Strings connected (energized)" val={`${scbEnergized.strings.toLocaleString()} / ${T.toLocaleString()}`} sub={`${(scbEnergized.strings/T*100).toFixed(1)}%`}/>
+                      <Row label="Strings remaining to connect" val={(T-scbEnergized.strings).toLocaleString()} sub={`${((T-scbEnergized.strings)*mwpPerTable).toFixed(2)} MWp`}/>
+                      <Row label="Energized, pending test" val={scbEnergized.n-scbTested.n} sub={`${(scbEnergized.mwp-scbTested.mwp).toFixed(2)} MWp`}/>
+                      {scbIncons.length>0 && (
+                        <div style={{marginTop:8,padding:"6px 8px",background:"#2a1212",border:"1px solid #ef444444",borderRadius:5,fontSize:10,color:"#f87171",lineHeight:1.5}}
+                          title={scbIncons.map(s=>`${s.id}: ${s.missingIds.join(", ")}`).join("\n")}>
+                          ⚠ {scbIncons.length} energized/tested SCB{scbIncons.length>1?"s":""} still ha{scbIncons.length>1?"ve":"s"} tables without PV panels mounted:
+                          <span style={{color:"#fca5a5"}}> {scbIncons.map(s=>`${s.id} (${s.missing})`).join(", ")}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                        <thead>
+                          <tr style={{color:"#555",fontSize:8,borderBottom:"1px solid #2d2d4a"}}>
+                            {[["MVPS","left","#555"],["SCBs","center","#555"],["Installed","center",SCB_STATUS[1].color],["Approved","center",SCB_STATUS[2].color],
+                              ["Energized","center",SCB_STATUS[3].color],["Tested","center",SCB_STATUS[4].color],["MWp energized","right",SCB_STATUS[3].color],["MWp tested","right",SCB_STATUS[4].color]]
+                              .map(([h,a,c])=><th key={h} style={{textAlign:a,padding:"3px 6px",fontWeight:600,color:c,whiteSpace:"nowrap"}}>{h}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...new Set(scbItems.map(s=>s.mv))].sort((a,b)=>a-b).map(mv=>{
+                            const list = scbItems.filter(s=>s.mv===mv);
+                            const cnt = r => list.filter(s=>scbRank(s.wiring)>=r).length;
+                            const mw = r => list.filter(s=>scbRank(s.wiring)>=r).reduce((a,s)=>a+s.total,0)*mwpPerTable;
+                            const cell = (v, full, c) => (
+                              <td style={{padding:"4px 6px",textAlign:"center",fontVariantNumeric:"tabular-nums",color:v===0?"#333":v===full?c:"#aaa",fontWeight:v===full?700:400}}>{v}</td>
+                            );
+                            const e = mw(SCB_RANK.ENERGIZED), t = mw(SCB_RANK.TESTED);
+                            return (
+                              <tr key={mv} style={{borderTop:"1px solid #1a1a2e"}}>
+                                <td style={{padding:"4px 6px"}}>
+                                  <span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:BC[mv]||"#555",marginRight:6}}/>
+                                  <span style={{color:"#ccc"}}>{mv}</span>
+                                </td>
+                                <td style={{padding:"4px 6px",textAlign:"center",color:"#666"}}>{list.length}</td>
+                                {cell(cnt(SCB_RANK.INSTALLED), list.length, SCB_STATUS[1].color)}
+                                {cell(cnt(SCB_RANK.APPROVED), list.length, SCB_STATUS[2].color)}
+                                {cell(cnt(SCB_RANK.ENERGIZED), list.length, SCB_STATUS[3].color)}
+                                {cell(cnt(SCB_RANK.TESTED), list.length, SCB_STATUS[4].color)}
+                                <td style={{padding:"4px 6px",textAlign:"right",color:e?"#ccc":"#333",fontVariantNumeric:"tabular-nums"}}>{e.toFixed(2)}</td>
+                                <td style={{padding:"4px 6px",textAlign:"right",color:t?SCB_STATUS[4].color:"#333",fontWeight:t?700:400,fontVariantNumeric:"tabular-nums"}}>{t.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                          <tr style={{borderTop:"2px solid #2d2d4a",fontWeight:700}}>
+                            <td style={{padding:"4px 6px",color:"#ccc"}}>TOTAL</td>
+                            <td style={{padding:"4px 6px",textAlign:"center",color:"#888"}}>{scbTotal}</td>
+                            {[scbInstalled,scbApproved,scbEnergized,scbTested].map((d,i)=>(
+                              <td key={i} style={{padding:"4px 6px",textAlign:"center",color:"#ccc"}}>{d.n}</td>
+                            ))}
+                            <td style={{padding:"4px 6px",textAlign:"right",color:"#ccc"}}>{scbEnergized.mwp.toFixed(2)}</td>
+                            <td style={{padding:"4px 6px",textAlign:"right",color:SCB_STATUS[4].color}}>{scbTested.mwp.toFixed(2)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div style={{fontSize:8,color:"#555",marginTop:6,lineHeight:1.5}}>
+                        Counts are cumulative (a tested SCB also counts as energized, approved and installed). 1 table = 1 string = 18.45 kWp.
+                        SCB 8A-04 feeds tables in MVPS 8 and 9 and is counted under MVPS 8.
+                      </div>
+                    </div>
+                  </div>
                 </Card>
               </div>
               {/* ── 80% and 100% Target Cards ── */}
@@ -2281,7 +2473,7 @@ export default function SolarPark() {
                   </div>
                 </Card>
               </div>
-              {subs.length > 0 && (
+              {SHOW_SUBCONS && subs.length > 0 && (
                 <div style={{marginTop:12}}>
                   <Card title="👷 SUBCONTRACTORS" accent="#f472b6">
                     <div style={{overflowX:"auto"}}>
@@ -2365,7 +2557,7 @@ export default function SolarPark() {
         const pvPct = pvExecuted / T * 100;
         const gapPts = pvPct - R.pctComplete;
         const tablesToPv80 = Math.max(0, MILESTONE_TABLES - pvExecuted);
-        const readyNow = R.items.filter(s => s.complete && s.wiring === 2).length;
+        const readyNow = R.items.filter(s => s.complete && scbRank(s.wiring) >= SCB_RANK.ENERGIZED).length;
         const near = R.items
           .filter(s => !s.complete && s.missing <= 2 && (!mvF || s.mv === mvF))
           .sort((a,b) => a.missing - b.missing || a.id.localeCompare(b.id));
@@ -2377,7 +2569,7 @@ export default function SolarPark() {
           mounted: (a,b)=>a.mounted-b.mounted                || a.id.localeCompare(b.id),
           pct:     (a,b)=>a.mounted/a.total-b.mounted/b.total|| a.id.localeCompare(b.id),
           missing: (a,b)=>a.missing-b.missing                || a.id.localeCompare(b.id),
-          wiring:  (a,b)=>a.wiring-b.wiring                  || a.id.localeCompare(b.id),
+          wiring:  (a,b)=>scbRank(a.wiring)-scbRank(b.wiring) || a.id.localeCompare(b.id),
         };
         const BTEST = { "0":m=>m===0, "1":m=>m===1, "2":m=>m===2, "3-4":m=>m>=3&&m<=4, "5-8":m=>m>=5&&m<=8, "9+":m=>m>=9 };
         const q = scbSearch.trim().toUpperCase();
@@ -2420,8 +2612,8 @@ export default function SolarPark() {
             info:"Distance between the share of tables with panels mounted and the share of SCBs fully complete. A wide gap means the work is spread thin over many boxes instead of finishing them one at a time — lots of panels installed, few boxes connectable." },
           { label:"TABLES TO 80% SCB", val:`${R.greedyTables}`, sub:`best case · 80% PV needs ${tablesToPv80}`, color:"#818cf8",
             info:`Fewest table-mounts that would bring ${R.target80} SCBs to complete, assuming crews always attack the boxes closest to finished. It is a best case: working in a scattered order can cost several times this. Shown next to it is what the classic 80% PV milestone still needs.` },
-          { label:"COMPLETE + WIRED", val:`${readyNow}`, sub:"mounted and fully wired", color:"#22d3ee",
-            info:'SCBs that are both mechanically complete (all panels mounted) and manually marked "Fully wired". These are the only ones genuinely ready to energise.' },
+          { label:"COMPLETE + ENERGIZED", val:`${readyNow}`, sub:"mounted and energized", color:"#22d3ee",
+            info:'SCBs that are both mechanically complete (all panels mounted) and manually marked "Energized" or "Tested" (every string connected to the box).' },
           { label:"ALL PV APPROVED", val:`${R.completeAppr}`, sub:"stricter: every table inspected", color:"#666",
             info:"Stricter variant of complete: every table of the box has passed PV inspection (phase 6), not merely been mounted. Useful as the quality-assured view of the same metric." },
         ];
@@ -2696,7 +2888,7 @@ export default function SolarPark() {
                     </div>
                   ))}
                   <div style={{fontSize:8,color:"#555",marginTop:6,lineHeight:1.5}}>
-                    "Fully wired" with panels left is a data inconsistency worth checking; "Not started" with panels done is ready to wire.
+                    "Energized" or "Tested" with panels left is a data inconsistency worth checking; "Not started" with panels done is ready to wire.
                   </div>
                 </div>
               </div>
@@ -2749,7 +2941,7 @@ export default function SolarPark() {
                   {R.histogram.map(b=><option key={b.key} value={b.key}>{b.label} ({b.n})</option>)}
                 </select>
                 <select style={sel} value={scbFWiring ?? ""} onChange={e=>setScbFWiring(e.target.value===""?null:+e.target.value)}>
-                  <option value="">Any wiring state</option>
+                  <option value="">Any SCB status</option>
                   {SCB_STATUS.map(st=><option key={st.value} value={st.value}>{st.label}</option>)}
                 </select>
                 {anyFilter && (
@@ -2767,7 +2959,7 @@ export default function SolarPark() {
                       <SortTh k="mounted" label="MOUNTED" w={70} align="right"/>
                       <SortTh k="pct" label="%" w={46} align="right"/>
                       <SortTh k="missing" label="MISSING" w={58} align="right"/>
-                      <SortTh k="wiring" label="WIRING" w={120}/>
+                      <SortTh k="wiring" label="SCB STATUS" w={120}/>
                       <SortTh k="id" label="PENDING TABLES"/>
                     </tr>
                   </thead>
@@ -2845,6 +3037,24 @@ export default function SolarPark() {
           ))}
         </div>
       )}
+      {scbCtx && (
+        <div onClick={e=>e.stopPropagation()} style={{position:"fixed",left:scbCtx.x,top:scbCtx.y,background:"#12121f",border:"1px solid #2d2d4a",borderRadius:7,padding:5,zIndex:200,boxShadow:"0 8px 32px rgba(0,0,0,.8)",minWidth:182}}>
+          <div style={{fontSize:9,color:"#555",padding:"2px 7px 4px",borderBottom:"1px solid #1e1e35",marginBottom:3}}>SCB {scbCtx.id} · {scbStringCount[scbCtx.id]||0} strings</div>
+          {SCB_STATUS.map(st=>{
+            const cur = (scbStatus[scbCtx.id]||0) === st.value;
+            return (
+              <div key={st.value} onClick={()=>{ setScbStatus(prev=>({ ...prev, [scbCtx.id]: st.value })); setScbCtx(null); }}
+                style={{display:"flex",alignItems:"center",gap:7,padding:"3px 7px",borderRadius:3,cursor:"pointer",fontSize:10,background:cur?"#1a1a2e":"transparent"}}
+                onMouseEnter={e=>e.currentTarget.style.background="#1e1e35"}
+                onMouseLeave={e=>e.currentTarget.style.background=cur?"#1a1a2e":"transparent"}>
+                <div style={{width:9,height:9,borderRadius:2,flexShrink:0,background:st.outline?"transparent":st.color,border:st.outline?`1px solid ${st.color}`:"none"}}/>
+                <span style={{color:cur?"#fff":"#ddd",fontWeight:cur?700:400}}>{st.label}</span>
+                {cur && <span style={{marginLeft:"auto",color:"#666",fontSize:9}}>✓</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {toast && (
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",
           background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#aaa",
@@ -2860,6 +3070,8 @@ export default function SolarPark() {
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
         input[type=number] { -moz-appearance:textfield; }
+        .sp-sidebar { scrollbar-width:none; }
+        .sp-sidebar::-webkit-scrollbar { display:none; }
       `}</style>
     </div>
   );
