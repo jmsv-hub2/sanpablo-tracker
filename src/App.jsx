@@ -304,6 +304,16 @@ async function pushConfig(config) {
     return json.ok;
   } catch(e) { return false; }
 }
+// Fresh read of the shared config, used right before every config write.
+async function fetchConfig() {
+  const res = await fetch(`${API_URL}?action=readConfig`);
+  const json = await res.json();
+  if (!json.ok || !json.config) throw new Error(json.error || "readConfig failed");
+  return json.config;
+}
+function subsForConfig(subs) {
+  return (subs || []).map(s => ({ id: s.id, name: s.name, color: s.color, contractedMS: s.contractedMS||0, contractedPV: s.contractedPV||0, contracted: s.contracted||0 }));
+}
 function saveLocalConfig(subs, phaseColors) {
   try {
     localStorage.setItem('sp_subs_cfg', JSON.stringify(subs.map(s => ({ id: s.id, color: s.color }))));
@@ -455,10 +465,17 @@ export default function SolarPark() {
   const [newSubContractedMS, setNewSubContractedMS] = useState("");
   const [newSubContractedPV, setNewSubContractedPV] = useState("");
   const [toast, setToast] = useState(null);
-  const showToast = useCallback(() => {
-    setToast("View only — no edit access");
-    setTimeout(() => setToast(null), 2500);
+  const showToast = useCallback((msg) => {
+    setToast(typeof msg === "string" ? msg : "View only — no edit access");
+    setTimeout(() => setToast(null), typeof msg === "string" ? 4000 : 2500);
   }, []);
+  // SCB edits are only allowed once the shared SCB data loaded from Sheets —
+  // otherwise they could never be saved and would be silently lost.
+  const scbEditBlocked = () => {
+    if (!canEdit) { showToast(); return true; }
+    if (!configLoadedOk.current) { showToast("SCB data didn't load from Google Sheets — reload the page before editing SCBs"); return true; }
+    return false;
+  };
   const [confirmRemove, setConfirmRemove] = useState(null);
   const [dragOverSubId, setDragOverSubId] = useState(null);
   const [syncStatus, setSyncStatus] = useState("loading"); 
@@ -566,13 +583,20 @@ export default function SolarPark() {
         if (sheetsData.configOk) {
           const colorMap = {};
           (localCfg.subColors || []).forEach(s => { colorMap[s.id] = s.color; });
-          if (sheetsData.subs) {
-            setSubs(sheetsData.subs.map(s => ({
-              ...s,
-              color: s.color || colorMap[s.id] || s.color,
-            })));
-          }
-          setScbStatus(applyDcStringsSeed(sheetsData.scbStatus || {}));
+          const loadedSubs = sheetsData.subs ? sheetsData.subs.map(s => ({
+            ...s,
+            color: s.color || colorMap[s.id] || s.color,
+          })) : null;
+          if (loadedSubs) setSubs(loadedSubs);
+          const rawScb = sheetsData.scbStatus || {};
+          // Baseline = what Sheets holds right now; only local edits made
+          // after this point (diffed against it) are ever written back.
+          cfgBaseline.current = {
+            scb: { ...rawScb },
+            colors: JSON.stringify(sheetsData.colors ?? null),
+            subs: JSON.stringify(subsForConfig(loadedSubs || cfgLatest.current.subs || [])),
+          };
+          setScbStatus(applyDcStringsSeed(rawScb));
           configLoadedOk.current = true;
         }
         if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
@@ -605,23 +629,81 @@ export default function SolarPark() {
   useEffect(() => {
     if(loaded) saveLocalConfig(subs, phaseColors);
   }, [subs, phaseColors, loaded]);
-  // Persist colors + subs + SCB status config to Sheets (debounced 2s).
+  // Persist colors + subs + SCB status config to Sheets (debounced).
   // Gated on configLoadedOk: only push once we've confirmed a real config
   // load from Sheets succeeded, so a fetch blip on startup can never write
   // an empty subs/scbStatus over real data.
+  // Only what THIS browser changed (diff vs cfgBaseline) is written, merged
+  // onto a fresh read of the config, so two editors never overwrite each
+  // other's SCBs and simply opening the tracker writes nothing.
   const configTimer = useRef(null);
+  const configRetry = useRef(null);
   const configLoadedOk = useRef(false);
-  useEffect(() => {
-    if(!loaded || !canEdit || !configLoadedOk.current) return;
-    if(configTimer.current) clearTimeout(configTimer.current);
-    configTimer.current = setTimeout(() => {
-      pushConfig({
-        phaseColors,
-        subs: subs.map(s => ({ id: s.id, name: s.name, color: s.color, contractedMS: s.contractedMS||0, contractedPV: s.contractedPV||0, contracted: s.contracted||0 })),
-        scbStatus,
+  const cfgBaseline = useRef(null);  // {scb, colors, subs} last loaded/saved by this browser
+  const cfgLatest = useRef({});      // current local {scbStatus, subs, phaseColors}
+  const cfgSaving = useRef(false);
+  const cfgDiff = () => {
+    const b = cfgBaseline.current, L = cfgLatest.current;
+    if (!b || !L.scbStatus) return null;
+    const scb = {};
+    new Set([...Object.keys(b.scb), ...Object.keys(L.scbStatus)]).forEach(id => {
+      if ((L.scbStatus[id]||0) !== (b.scb[id]||0)) scb[id] = L.scbStatus[id]||0;
+    });
+    const colors = JSON.stringify(L.phaseColors) !== b.colors;
+    const subsChanged = JSON.stringify(subsForConfig(L.subs)) !== b.subs;
+    return (Object.keys(scb).length || colors || subsChanged) ? { scb, colors, subs: subsChanged } : null;
+  };
+  const flushConfig = useCallback(async () => {
+    if (cfgSaving.current) return;
+    const d = cfgDiff();
+    if (!d) return;
+    cfgSaving.current = true;
+    if (configRetry.current) { clearTimeout(configRetry.current); configRetry.current = null; }
+    setSyncStatus("saving");
+    const L = cfgLatest.current;
+    const sentColors = L.phaseColors, sentSubs = subsForConfig(L.subs);
+    let ok = false;
+    try {
+      const fresh = await fetchConfig();
+      ok = await pushConfig({
+        ...fresh,
+        phaseColors: d.colors ? sentColors : (fresh.phaseColors || sentColors),
+        subs: d.subs ? sentSubs : (fresh.subs || sentSubs),
+        scbStatus: { ...(fresh.scbStatus || {}), ...d.scb },
       });
-    }, 2000);
-  }, [subs, phaseColors, scbStatus, loaded, canEdit]);
+    } catch(e) { ok = false; }
+    cfgSaving.current = false;
+    const n = Object.keys(d.scb).length;
+    if (ok) {
+      const b = cfgBaseline.current;
+      cfgBaseline.current = {
+        scb: { ...b.scb, ...d.scb },
+        colors: d.colors ? JSON.stringify(sentColors) : b.colors,
+        subs: d.subs ? JSON.stringify(sentSubs) : b.subs,
+      };
+      setSyncStatus("ok");
+      setSyncMsg(`Saved ${n ? `${n} SCB change${n>1?"s":""}` : "settings"} · ${new Date().toLocaleTimeString()}`);
+      if (cfgDiff()) flushConfig(); // edits made while this save was in flight
+    } else {
+      setSyncStatus("error");
+      setSyncMsg("SCB save failed — retrying in 15 s. Don't close the page.");
+      configRetry.current = setTimeout(flushConfig, 15000);
+    }
+  }, []);
+  useEffect(() => {
+    cfgLatest.current = { scbStatus, subs, phaseColors };
+    if(!loaded || !canEdit || !configLoadedOk.current) return;
+    if(!cfgDiff()) return;
+    if(configTimer.current) clearTimeout(configTimer.current);
+    setSyncStatus("saving");
+    configTimer.current = setTimeout(flushConfig, 1500);
+  }, [subs, phaseColors, scbStatus, loaded, canEdit, flushConfig]);
+  // Warn before closing the tab while an SCB/config change is still unsaved.
+  useEffect(() => {
+    const h = (e) => { if (canEdit && cfgDiff()) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [canEdit]);
   const schedulePush = useCallback((updates) => {
     updates.forEach(u => {
       const idx = pendingSync.current.findIndex(x => x.id === u.id);
@@ -1146,7 +1228,7 @@ export default function SolarPark() {
               color:       syncStatus==="ok"?"#22c55e": syncStatus==="saving"?"#818cf8": syncStatus==="error"?"#f87171":"#555",
               border:`1px solid ${syncStatus==="ok"?"#22c55e33": syncStatus==="saving"?"#818cf833": syncStatus==="error"?"#f8717133":"#1e1e35"}`
             }} title={syncMsg}>
-              {syncStatus==="loading"?"⏳ Loading…": syncStatus==="saving"?"💾 Saving…": syncStatus==="ok"?"✓ Synced": "⚠ Offline"}{syncDate && <span style={{fontSize:9,color:"#444",marginLeft:6}}>· Last update: {syncDate}</span>}
+              {syncStatus==="loading"?"⏳ Loading…": syncStatus==="saving"?"💾 Saving…": syncStatus==="ok"?"✓ Synced": syncMsg.includes("failed")?"⚠ Save failed":"⚠ Offline"}{syncDate && <span style={{fontSize:9,color:"#444",marginLeft:6}}>· Last update: {syncDate}</span>}
             </div>
             <button onClick={reloadFromSheets} disabled={syncStatus==="loading"||syncStatus==="saving"}
               title="Reload data from Google Sheets"
@@ -1555,8 +1637,8 @@ export default function SolarPark() {
                       onMouseEnter={e=>{ setHoveredScb(s.id); setScbTooltip({id:s.id, mv:scbMvps(s.id), strings:scbStringCount[s.id]||0, status:entry, x:e.clientX, y:e.clientY}); }}
                       onMouseMove={e=>setScbTooltip(t=>t?{...t, x:e.clientX, y:e.clientY}:t)}
                       onMouseLeave={()=>{ setHoveredScb(null); setScbTooltip(null); }}
-                      onClick={e=>{ e.stopPropagation(); if(!canEdit){showToast();return;} setScbStatus(prev=>({ ...prev, [s.id]: nextScbStatus(prev[s.id]||0) })); }}
-                      onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); if(!canEdit){showToast();return;} setCtx(null); setScbTooltip(null); setScbCtx({id:s.id, x:e.clientX, y:e.clientY}); }}/>
+                      onClick={e=>{ e.stopPropagation(); if(scbEditBlocked()) return; setScbStatus(prev=>({ ...prev, [s.id]: nextScbStatus(prev[s.id]||0) })); }}
+                      onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); if(scbEditBlocked()) return; setCtx(null); setScbTooltip(null); setScbCtx({id:s.id, x:e.clientX, y:e.clientY}); }}/>
                   );
                 })}
                 {TABLES.map(t=>{
@@ -3043,7 +3125,7 @@ export default function SolarPark() {
           {SCB_STATUS.map(st=>{
             const cur = (scbStatus[scbCtx.id]||0) === st.value;
             return (
-              <div key={st.value} onClick={()=>{ setScbStatus(prev=>({ ...prev, [scbCtx.id]: st.value })); setScbCtx(null); }}
+              <div key={st.value} onClick={()=>{ setScbCtx(null); if(scbEditBlocked()) return; setScbStatus(prev=>({ ...prev, [scbCtx.id]: st.value })); }}
                 style={{display:"flex",alignItems:"center",gap:7,padding:"3px 7px",borderRadius:3,cursor:"pointer",fontSize:10,background:cur?"#1a1a2e":"transparent"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#1e1e35"}
                 onMouseLeave={e=>e.currentTarget.style.background=cur?"#1a1a2e":"transparent"}>
