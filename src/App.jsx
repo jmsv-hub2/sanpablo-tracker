@@ -249,7 +249,7 @@ async function loadFromSheets() {
       }
     });
     // Config: colors + full subs list (with contracted, color)
-    let colors = null, subsFromConfig = null, scbStatusFromConfig = {}, configOk = false;
+    let colors = null, subsFromConfig = null, scbStatusFromConfig = {}, epcFromConfig = null, configOk = false;
     try {
       const cfgJson = await cfgRes.json();
       if (cfgJson.ok && cfgJson.config) {
@@ -263,13 +263,14 @@ async function loadFromSheets() {
           });
         }
         scbStatusFromConfig = cfgJson.config.scbStatus || {};
+        epcFromConfig = cfgJson.config.epcInspection || null;
       }
     } catch(e) {}
     // Build final subs: prefer config (preserves order/color/contracted) else sheets map.
     // Only fall back to rebuilding subs from raw rows when config genuinely had none —
     // never when the config fetch itself failed, or we'd wipe the real list on a blip.
     const finalSubs = subsFromConfig || (configOk ? buildSubs(Object.entries(subsMap).map(([name, tables]) => ({id:name,name,tables}))) : null);
-    return { phases, subs: finalSubs, colors, subconPV: pvMap, subconMS: msMap, scbStatus: scbStatusFromConfig, configOk, source: "sheets" };
+    return { phases, subs: finalSubs, colors, subconPV: pvMap, subconMS: msMap, scbStatus: scbStatusFromConfig, epcInspection: epcFromConfig, configOk, source: "sheets" };
   } catch(e) {
     return { phases: {...INITIAL_PHASES}, subs: null, colors: null, subconPV: {}, subconMS: {}, scbStatus: {}, configOk: false, source: "embedded" };
   }
@@ -310,6 +311,82 @@ async function fetchConfig() {
   const json = await res.json();
   if (!json.ok || !json.config) throw new Error(json.error || "readConfig failed");
   return json.config;
+}
+// EPC approved internal inspection: a per-table flag, independent of phase.
+// Stored in the shared config as a bitmask over the fixed table order
+// (~600 chars for all tables) so the config stays small however many tables
+// get marked. decodeEpc returns null when stored data doesn't match the
+// current layout, so it is never overwritten by mistake.
+const EPC_COLOR = "#22d3ee";
+// Look of EPC-inspected tables on the map; per browser (localStorage only).
+const EPC_STYLE_KEY = 'sp_epc_style';
+const EPC_STYLE_DEFAULT = { color: EPC_COLOR, mode: "fill" };
+const EPC_SWATCHES = ["#22d3ee", "#facc15", "#f472b6", "#a78bfa", "#ffffff", "#ef4444", "#34d399", "#fb923c"];
+const EPC_MODES = [
+  { k: "fill",    label: "Fill" },
+  { k: "outline", label: "Outline" },
+  { k: "hatch",   label: "Hatch" },
+];
+function loadEpcStyle() {
+  try {
+    const s = JSON.parse(localStorage.getItem(EPC_STYLE_KEY)) || {};
+    return {
+      color:  /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : EPC_STYLE_DEFAULT.color,
+      mode:   EPC_MODES.some(m => m.k === s.mode) ? s.mode : EPC_STYLE_DEFAULT.mode,
+    };
+  } catch(e) { return { ...EPC_STYLE_DEFAULT }; }
+}
+// SVG for one EPC-inspected table at (tx,ty), sized RW×RH. hatchId must point
+// at an epcHatchDef pattern in the same <svg>.
+function epcHatchDef(id, color) {
+  return (
+    <pattern id={id} width={1.4} height={1.4} patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+      <line x1={0} y1={0} x2={0} y2={1.4} stroke={color} strokeWidth={0.6}/>
+    </pattern>
+  );
+}
+function epcMark(style, tx, ty, hatchId) {
+  const c = style.color;
+  return (
+    <>
+      {style.mode === "fill" && (
+        <rect x={tx+0.4} y={ty+0.4} width={RW-0.8} height={RH-0.8} rx={0.3}
+          fill={c} fillOpacity={0.7} stroke={c} strokeWidth={0.25} pointerEvents="none"/>
+      )}
+      {style.mode === "outline" && (
+        <rect x={tx+0.45} y={ty+0.45} width={RW-0.9} height={RH-0.9} rx={0.3}
+          fill="none" stroke={c} strokeWidth={0.6} pointerEvents="none"/>
+      )}
+      {style.mode === "hatch" && (
+        <rect x={tx+0.4} y={ty+0.4} width={RW-0.8} height={RH-0.8} rx={0.3}
+          fill={`url(#${hatchId})`} stroke={c} strokeWidth={0.3} pointerEvents="none"/>
+      )}
+    </>
+  );
+}
+// Black or white text, whichever reads better on the given colour.
+function epcInk(hex) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (r*299 + g*587 + b*114) / 1000 > 140 ? "#000" : "#fff";
+}
+let _epcTables = null;
+const epcTables = () => (_epcTables = _epcTables || buildTables());
+function encodeEpc(map) {
+  const tables = epcTables();
+  const bytes = new Uint8Array(Math.ceil(tables.length / 8));
+  tables.forEach((t, i) => { if (map[t.id]) bytes[i >> 3] |= 1 << (i & 7); });
+  let s = ""; bytes.forEach(b => { s += String.fromCharCode(b); });
+  return { v: 1, n: tables.length, bits: btoa(s) };
+}
+function decodeEpc(raw) {
+  if (!raw) return {};
+  const tables = epcTables();
+  if (raw.v !== 1 || raw.n !== tables.length || typeof raw.bits !== "string") return null;
+  try {
+    const s = atob(raw.bits), out = {};
+    tables.forEach((t, i) => { if (s.charCodeAt(i >> 3) & (1 << (i & 7))) out[t.id] = 1; });
+    return out;
+  } catch(e) { return null; }
 }
 function subsForConfig(subs) {
   return (subs || []).map(s => ({ id: s.id, name: s.name, color: s.color, contractedMS: s.contractedMS||0, contractedPV: s.contractedPV||0, contracted: s.contracted||0 }));
@@ -440,6 +517,14 @@ export default function SolarPark() {
   const [scbStatusFilter, setScbStatusFilter] = useState(new Set()); // highlight SCB squares by status
   const [borderEnergized, setBorderEnergized] = useState(false); // table borders: energized SCBs
   const [borderTested, setBorderTested]       = useState(false); // table borders: tested SCBs
+  const [epcInsp, setEpcInsp]   = useState({});    // tableId → 1: EPC approved internal inspection (independent of phase)
+  const [epcMode, setEpcMode]   = useState(false); // map brush that marks/unmarks EPC inspection
+  const [showEpc, setShowEpc]   = useState(() => { try { return localStorage.getItem('sp_epc_show') === '1'; } catch(e) { return false; } }); // highlight EPC-inspected tables on the map (remembered per browser)
+  const [epcStyle, setEpcStyle] = useState(loadEpcStyle); // colour / representation (remembered per browser)
+  const [epcStyleOpen, setEpcStyleOpen] = useState(false);
+  useEffect(() => { try { localStorage.setItem('sp_epc_show', showEpc ? '1' : '0'); } catch(e) {} }, [showEpc]);
+  useEffect(() => { try { localStorage.setItem(EPC_STYLE_KEY, JSON.stringify(epcStyle)); } catch(e) {} }, [epcStyle]);
+  const epcPaint = useRef(null);                   // 1 = marking, 0 = unmarking while the mouse is held
   // Legend highlight: cumulative rows match that step and anything past it.
   const scbPassesFilter = useCallback((v) => {
     if (!scbStatusFilter.size) return true;
@@ -476,6 +561,19 @@ export default function SolarPark() {
     if (!configLoadedOk.current) { showToast("SCB data didn't load from Google Sheets — reload the page before editing SCBs"); return true; }
     return false;
   };
+  const epcEditBlocked = () => {
+    if (!canEdit) { showToast(); return true; }
+    if (!configLoadedOk.current) { showToast("Shared data didn't load from Google Sheets — reload the page before marking EPC inspection"); return true; }
+    return false;
+  };
+  const setEpc = useCallback((id, v) => {
+    setEpcInsp(prev => {
+      if (!!prev[id] === !!v) return prev;
+      const n = { ...prev };
+      if (v) n[id] = 1; else delete n[id];
+      return n;
+    });
+  }, []);
   const [confirmRemove, setConfirmRemove] = useState(null);
   const [dragOverSubId, setDragOverSubId] = useState(null);
   const [syncStatus, setSyncStatus] = useState("loading"); 
@@ -561,6 +659,8 @@ export default function SolarPark() {
     setScbStatusFilter(new Set());
     setBorderEnergized(false);
     setBorderTested(false);
+    setShowEpc(false);
+    setEpcMode(false);
     setBf(new Set());
     setPf(new Set());
     setPaintMode(false);
@@ -589,14 +689,20 @@ export default function SolarPark() {
           })) : null;
           if (loadedSubs) setSubs(loadedSubs);
           const rawScb = sheetsData.scbStatus || {};
+          const rawEpc = decodeEpc(sheetsData.epcInspection);
           // Baseline = what Sheets holds right now; only local edits made
           // after this point (diffed against it) are ever written back.
           cfgBaseline.current = {
             scb: { ...rawScb },
+            epc: { ...(rawEpc || {}) },
             colors: JSON.stringify(sheetsData.colors ?? null),
             subs: JSON.stringify(subsForConfig(loadedSubs || cfgLatest.current.subs || [])),
           };
           setScbStatus(applyDcStringsSeed(rawScb));
+          // Dev builds never write to Sheets, so keep demo marks in this browser.
+          let devEpc = null;
+          if (IS_DEV) { try { devEpc = JSON.parse(localStorage.getItem('sp_dev_epc')); } catch(e) {} }
+          setEpcInsp(devEpc || rawEpc || {});
           configLoadedOk.current = true;
         }
         if(sheetsData.subconPV) setSubconPV(sheetsData.subconPV);
@@ -649,9 +755,13 @@ export default function SolarPark() {
     new Set([...Object.keys(b.scb), ...Object.keys(L.scbStatus)]).forEach(id => {
       if ((L.scbStatus[id]||0) !== (b.scb[id]||0)) scb[id] = L.scbStatus[id]||0;
     });
+    const epc = {}, bEpc = b.epc || {}, lEpc = L.epcInsp || {};
+    new Set([...Object.keys(bEpc), ...Object.keys(lEpc)]).forEach(id => {
+      if ((lEpc[id]||0) !== (bEpc[id]||0)) epc[id] = lEpc[id]||0;
+    });
     const colors = JSON.stringify(L.phaseColors) !== b.colors;
     const subsChanged = JSON.stringify(subsForConfig(L.subs)) !== b.subs;
-    return (Object.keys(scb).length || colors || subsChanged) ? { scb, colors, subs: subsChanged } : null;
+    return (Object.keys(scb).length || Object.keys(epc).length || colors || subsChanged) ? { scb, epc, colors, subs: subsChanged } : null;
   };
   const flushConfig = useCallback(async () => {
     if (cfgSaving.current) return;
@@ -663,26 +773,39 @@ export default function SolarPark() {
     const L = cfgLatest.current;
     const sentColors = L.phaseColors, sentSubs = subsForConfig(L.subs);
     let ok = false;
+    const nEpc = Object.keys(d.epc).length;
     try {
       const fresh = await fetchConfig();
-      ok = await pushConfig({
+      const next = {
         ...fresh,
         phaseColors: d.colors ? sentColors : (fresh.phaseColors || sentColors),
         subs: d.subs ? sentSubs : (fresh.subs || sentSubs),
         scbStatus: { ...(fresh.scbStatus || {}), ...d.scb },
-      });
+      };
+      // EPC: apply only this browser's per-table changes onto the fresh copy.
+      if (nEpc) {
+        const freshEpc = decodeEpc(fresh.epcInspection);
+        if (!freshEpc) throw new Error("epcInspection doesn't match the table layout");
+        Object.entries(d.epc).forEach(([id, v]) => { if (v) freshEpc[id] = 1; else delete freshEpc[id]; });
+        next.epcInspection = encodeEpc(freshEpc);
+      }
+      ok = await pushConfig(next);
     } catch(e) { ok = false; }
     cfgSaving.current = false;
     const n = Object.keys(d.scb).length;
     if (ok) {
       const b = cfgBaseline.current;
+      const epcBase = { ...(b.epc || {}) };
+      Object.entries(d.epc).forEach(([id, v]) => { if (v) epcBase[id] = 1; else delete epcBase[id]; });
       cfgBaseline.current = {
         scb: { ...b.scb, ...d.scb },
+        epc: epcBase,
         colors: d.colors ? JSON.stringify(sentColors) : b.colors,
         subs: d.subs ? JSON.stringify(sentSubs) : b.subs,
       };
       setSyncStatus("ok");
-      setSyncMsg(`Saved ${n ? `${n} SCB change${n>1?"s":""}` : "settings"} · ${new Date().toLocaleTimeString()}`);
+      const parts = [n && `${n} SCB change${n>1?"s":""}`, nEpc && `${nEpc} EPC inspection change${nEpc>1?"s":""}`].filter(Boolean);
+      setSyncMsg(`Saved ${parts.length ? parts.join(" + ") : "settings"} · ${new Date().toLocaleTimeString()}`);
       if (cfgDiff()) flushConfig(); // edits made while this save was in flight
     } else {
       setSyncStatus("error");
@@ -691,13 +814,16 @@ export default function SolarPark() {
     }
   }, []);
   useEffect(() => {
-    cfgLatest.current = { scbStatus, subs, phaseColors };
+    cfgLatest.current = { scbStatus, subs, phaseColors, epcInsp };
     if(!loaded || !canEdit || !configLoadedOk.current) return;
     if(!cfgDiff()) return;
     if(configTimer.current) clearTimeout(configTimer.current);
     setSyncStatus("saving");
     configTimer.current = setTimeout(flushConfig, 1500);
-  }, [subs, phaseColors, scbStatus, loaded, canEdit, flushConfig]);
+  }, [subs, phaseColors, scbStatus, epcInsp, loaded, canEdit, flushConfig]);
+  useEffect(() => {
+    if (IS_DEV && loaded && configLoadedOk.current) { try { localStorage.setItem('sp_dev_epc', JSON.stringify(epcInsp)); } catch(e) {} }
+  }, [epcInsp, loaded]);
   // Warn before closing the tab while an SCB/config change is still unsaved.
   useEffect(() => {
     const h = (e) => { if (canEdit && cfgDiff()) { e.preventDefault(); e.returnValue = ""; } };
@@ -933,6 +1059,7 @@ export default function SolarPark() {
   }, [phases, schedulePush, subs]);
   const click = useCallback((id, e) => {
     e.stopPropagation();
+    if(epcMode) return; // EPC brush is handled on mousedown
     if(subAssignMode && subAssignId) {
       if(unassignMode) {
         setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
@@ -947,9 +1074,10 @@ export default function SolarPark() {
     const newPh = ((phases?.[id]||0)+1) % 7;
     setPhases(p => ({...p, [id]: newPh}));
     schedulePush([{ id, phase: newPh, subcontractor_ms: getSubForTable(id) }]);
-  }, [paintMode, applyPhase, subAssignMode, subAssignId, toggleSubTable, phases, schedulePush, getSubForTable, showPhases]);
+  }, [epcMode, paintMode, applyPhase, subAssignMode, subAssignId, toggleSubTable, phases, schedulePush, getSubForTable, showPhases]);
   const rclick = useCallback((id, e) => {
     e.preventDefault(); e.stopPropagation();
+    if(epcMode) return; // EPC brush: right-drag unmarks, handled on mousedown
     if(subAssignMode && subAssignId) { // sub assign always allowed
       setSubs(prev=>prev.map(s=>s.id!==subAssignId?s:{...s,tables:s.tables.filter(x=>x!==id)}));
       schedulePush([{ id, phase: phases?.[id]||0, subcontractor_ms: "" }]);
@@ -963,7 +1091,7 @@ export default function SolarPark() {
       return;
     }
     setCtx({ id, x:e.clientX, y:e.clientY });
-  }, [paintMode, subAssignMode, subAssignId, phases, schedulePush, getSubForTable, showPhases]);
+  }, [epcMode, paintMode, subAssignMode, subAssignId, phases, schedulePush, getSubForTable, showPhases]);
   const handleEnter = useCallback((id, e) => {
     const t = TABLES.find(t=>t.id===id);
     setTooltip({id, ph:PHASES[Math.min(phases?.[id]||0, PHASES.length-1)].label, mv:t?.m, x:e.clientX, y:e.clientY});
@@ -976,7 +1104,8 @@ export default function SolarPark() {
       } else addToSub(subAssignId, id);
     }
     else if(paintMode && isPainting.current) applyPhase(id);
-  }, [paintMode, applyPhase, phases, subAssignMode, subAssignId, addToSub, TABLES]);
+    else if(epcMode && epcPaint.current !== null) setEpc(id, epcPaint.current);
+  }, [paintMode, applyPhase, phases, subAssignMode, subAssignId, addToSub, TABLES, epcMode, setEpc]);
   const setPhase = useCallback((id, ph) => {
     setPhases(p => ({...p, [id]:ph}));
     schedulePush([{ id, phase: ph, subcontractor_ms: getSubForTable(id) }]);
@@ -997,6 +1126,17 @@ export default function SolarPark() {
       return;
     }
     if(paintMode) { isPainting.current=true; dragStart.current=null; return; }
+    // EPC brush: left = toggle first table, then drag applies the same; right = unmark
+    const epcEl = epcMode && e.target.closest("[data-id]");
+    if(epcEl) {
+      dragStart.current = null;
+      if(epcEditBlocked()) return;
+      const id = epcEl.getAttribute("data-id");
+      const v = e.button === 2 ? 0 : (epcInsp[id] ? 0 : 1);
+      epcPaint.current = v;
+      setEpc(id, v);
+      return;
+    }
     if(subAssignMode) {
       if(e.target.closest("[data-id]")) {
         isPainting.current=true;
@@ -1013,7 +1153,7 @@ export default function SolarPark() {
     } else {
       dragStart.current = null;
     }
-  }, [paintMode, subAssignMode]);
+  }, [paintMode, subAssignMode, epcMode, epcInsp, setEpc]);
   const onSvgMouseUp = useCallback((e) => {
     if(selStartRef.current) {
       const r = { x0:selStartRef.current.x, y0:selStartRef.current.y, x1:e.clientX, y1:e.clientY };
@@ -1042,9 +1182,10 @@ export default function SolarPark() {
       return;
     }
     isPainting.current = false;
+    epcPaint.current = null;
     dragStart.current = null;
-    if(canvasRef.current) canvasRef.current.style.cursor = subAssignMode?"cell":paintMode?"crosshair":"grab";
-  }, [paintMode, subAssignMode, phases, showPhases, showSubs, pf, bf, subFilter, subs, TABLES]);
+    if(canvasRef.current) canvasRef.current.style.cursor = subAssignMode?"cell":(paintMode||epcMode)?"crosshair":"grab";
+  }, [paintMode, subAssignMode, epcMode, phases, showPhases, showSubs, pf, bf, subFilter, subs, TABLES]);
   const onMouseMove = useCallback((e) => {
     if(selStartRef.current && e.buttons===1) {
       setSelRect({x0:selStartRef.current.x,y0:selStartRef.current.y,x1:e.clientX,y1:e.clientY});
@@ -1272,7 +1413,7 @@ export default function SolarPark() {
             <div style={{marginBottom:6,padding:"7px 8px",background:"#0d0d1a",border:"1px solid #1e1e35",borderRadius:5}}>
               {[
                 {icon:"🎨", label:"PAINT MODE", active:paintMode, color:"#22c55e",
-                  onClick:()=>{if(!canEdit){showToast();return;} setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); } return next; });}},
+                  onClick:()=>{if(!canEdit){showToast();return;} setPaintMode(m=>{ const next=!m; if(next){ setShowPhases(true); setSubAssignMode(false); setEpcMode(false); } return next; });}},
                 {icon:"🏷️", label:"LABELS",     active:showLabels, color:"#f5a623",
                   onClick:()=>setShowLabels(s=>!s)},
               ].map(({icon,label,active,color,onClick})=>(
@@ -1385,11 +1526,11 @@ export default function SolarPark() {
                 </div>
                 {!collapseSubcons && canEdit && (
                   <div style={{display:"flex",gap:4,margin:"4px 0"}}>
-                    <button onClick={e=>{e.stopPropagation();setSubAssignMode(m=>!m);setUnassignMode(false);setPaintMode(false);}}
+                    <button onClick={e=>{e.stopPropagation();setSubAssignMode(m=>!m);setUnassignMode(false);setPaintMode(false);setEpcMode(false);}}
                       style={{flex:1,background:subAssignMode&&!unassignMode?"#818cf8":"#1e1e35",border:`1px solid ${subAssignMode&&!unassignMode?"#818cf8":"#2d2d4a"}`,color:subAssignMode&&!unassignMode?"#000":"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
                       {subAssignMode&&!unassignMode?"ASSIGN ✓":"ASSIGN"}
                     </button>
-                    <button onClick={e=>{e.stopPropagation();setUnassignMode(m=>!m);setSubAssignMode(true);setPaintMode(false);}}
+                    <button onClick={e=>{e.stopPropagation();setUnassignMode(m=>!m);setSubAssignMode(true);setPaintMode(false);setEpcMode(false);}}
                       style={{flex:1,background:unassignMode?"#f87171":"#1e1e35",border:`1px solid ${unassignMode?"#f87171":"#2d2d4a"}`,color:unassignMode?"#000":"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
                       {unassignMode?"REMOVE ✓":"REMOVE"}
                     </button>
@@ -1598,6 +1739,79 @@ export default function SolarPark() {
               </>}
             </div>
             <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
+            {/* ── EPC approved internal inspection (per-table flag, independent of phase) ── */}
+            {(() => {
+              const nEpc = TABLES.reduce((a,t)=>a+(epcInsp[t.id]?1:0),0);
+              const pEpc = total ? nEpc/total*100 : 0;
+              const mwpT = 30*615/1e6;
+              const ec = epcStyle.color;
+              return (
+                <div style={{marginBottom:2}}>
+                  <div style={{fontSize:10,color:"#aaa",letterSpacing:1,fontWeight:700,padding:"3px 0"}}>EPC INTERNAL INSPECTION</div>
+                  <div style={{display:"flex",gap:4,marginBottom:5}}>
+                    <button onClick={()=>setShowEpc(v=>!v)} title="Highlight every table with EPC approved internal inspection"
+                      style={{flex:1,background:showEpc?ec:"#1e1e35",border:`1px solid ${showEpc?ec:"#2d2d4a"}`,
+                        color:showEpc?epcInk(ec):"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                      Approved {showEpc?"ON":"OFF"}
+                    </button>
+                    {canEdit && (
+                      <button onClick={()=>{ if(epcEditBlocked()) return; setEpcMode(m=>{ const next=!m; if(next){ setShowEpc(true); setPaintMode(false); setSubAssignMode(false); setUnassignMode(false); } return next; }); }}
+                        title="Brush to mark / unmark tables as EPC approved internal inspection"
+                        style={{flex:1,background:epcMode?ec+"22":"#1e1e35",border:`1px solid ${epcMode?ec:"#2d2d4a"}`,
+                          color:epcMode?ec:"#666",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:9,fontWeight:700}}>
+                        🖌 Mark {epcMode?"ON":"OFF"}
+                      </button>
+                    )}
+                  </div>
+                  {epcMode && <div style={{fontSize:8,color:"#8a8aa8",marginBottom:5,lineHeight:1.5}}>Click / drag = mark (or unmark if already marked) · Right-drag = unmark · Drag empty space = pan</div>}
+                  <div onClick={()=>setEpcStyleOpen(o=>!o)}
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"2px 0",marginBottom:4,cursor:"pointer"}}>
+                    <span style={{fontSize:9,color:"#888",fontWeight:600,flex:1}}>Style {epcStyleOpen?"▾":"▸"}</span>
+                    <svg width={52} height={14} viewBox={`${ROX-1} ${ROY-1.6} ${RW+2} ${RH+3.2}`}>
+                      <defs>{epcHatchDef("epcHatchPrev", ec)}</defs>
+                      <rect x={ROX} y={ROY} width={RW} height={RH} rx={0.5} fill={phaseColors.pv} stroke={PHASES[0].border} strokeWidth={0.15}/>
+                      {epcMark(epcStyle, ROX, ROY, "epcHatchPrev")}
+                    </svg>
+                  </div>
+                  {epcStyleOpen && (
+                    <div style={{padding:"6px",marginBottom:6,background:"#0d0d1a",border:"1px solid #1e1e35",borderRadius:4}}>
+                      <div style={{fontSize:8,color:"#666",marginBottom:3}}>Colour</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:3,alignItems:"center",marginBottom:6}}>
+                        {EPC_SWATCHES.map(c=>(
+                          <div key={c} onClick={()=>setEpcStyle(s=>({...s,color:c}))} title={c}
+                            style={{width:14,height:14,borderRadius:3,background:c,cursor:"pointer",
+                              outline:ec.toLowerCase()===c?"2px solid #fff":"none",outlineOffset:1}}/>
+                        ))}
+                        <input type="color" value={ec} onChange={e=>setEpcStyle(s=>({...s,color:e.target.value}))} title="Custom colour"
+                          style={{width:20,height:16,padding:0,border:"1px solid #2d2d4a",background:"transparent",cursor:"pointer"}}/>
+                      </div>
+                      <div style={{fontSize:8,color:"#666",marginBottom:3}}>Representation</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3}}>
+                        {EPC_MODES.map(m=>(
+                          <button key={m.k} onClick={()=>setEpcStyle(s=>({...s,mode:m.k}))}
+                            style={{background:epcStyle.mode===m.k?ec+"33":"#1e1e35",border:`1px solid ${epcStyle.mode===m.k?ec:"#2d2d4a"}`,
+                              color:epcStyle.mode===m.k?"#fff":"#888",borderRadius:3,padding:"3px 0",cursor:"pointer",fontSize:8.5,fontWeight:600}}>
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div onClick={()=>setEpcStyle({...EPC_STYLE_DEFAULT})}
+                        style={{fontSize:8,color:"#666",marginTop:5,textAlign:"right",cursor:"pointer"}}>↺ default style</div>
+                    </div>
+                  )}
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#666",marginBottom:1}}>
+                    <span>Tables</span><span style={{color:ec}}>{nEpc.toLocaleString()} / {total.toLocaleString()} ({pEpc.toFixed(1)}%)</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#666",marginBottom:3}}>
+                    <span>MWp</span><span style={{color:ec}}>{(nEpc*mwpT).toFixed(2)} / {(total*mwpT).toFixed(2)}</span>
+                  </div>
+                  <div style={{height:4,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:pEpc+"%",background:ec,borderRadius:2,transition:"width .3s"}}/>
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{height:1,background:"#1e1e35",margin:"6px 0"}}/>
             <button onClick={resetAll}
               style={{width:"100%",background:"#1a1a2e",border:"1px solid #2d2d4a",color:"#666",borderRadius:4,padding:"5px 0",cursor:"pointer",fontSize:9,letterSpacing:1,marginBottom:6}}
               title="Reset view and all layers to default">
@@ -1614,6 +1828,7 @@ export default function SolarPark() {
           </div>
           <div ref={canvasRef} style={{flex:1,overflow:"hidden",position:"relative",cursor:canEdit?(subAssignMode?"cell":paintMode?"crosshair":"grab"):"default"}}>
             <svg width="100%" height="100%">
+              <defs>{epcHatchDef("epcHatchMap", epcStyle.color)}</defs>
               <g ref={svgGroupRef} transform="translate(10,10) scale(1)">
                 <rect x={-5} y={-5} width={CW+10} height={CH+10} fill="#0d0d14"/>
                 {showMvps && Object.entries(hulls.polygons).map(([mv,pts])=>(
@@ -1670,6 +1885,8 @@ export default function SolarPark() {
                     : borderTested && scbR>=SCB_RANK.TESTED ? SCB_STATUS[SCB_RANK.TESTED].color
                     : borderEnergized && scbR>=SCB_RANK.ENERGIZED ? SCB_STATUS[SCB_RANK.ENERGIZED].color
                     : null;
+                  // EPC approved internal inspection overlay (independent of phase/borders)
+                  const epcOn = (showEpc || epcMode) && epcInsp[t.id] && !(bf.size>0 && !bf.has(t.m));
                   const tx = t.x+ROX, ty = t.y+ROY;
                   return (
                     <g key={t.id}
@@ -1684,6 +1901,7 @@ export default function SolarPark() {
                         fillOpacity={eggColor ? 1 : fillOpacity}
                         stroke={scbHighlight ? "#ffffff" : stringBorder || strokeColor}
                         strokeWidth={scbHighlight ? 0.5 : stringBorder ? 0.8 : strokeW}/>
+                      {epcOn && epcMark(epcStyle, tx, ty, "epcHatchMap")}
                       {scbHighlight && (
                         <rect x={tx-0.6} y={ty-0.6} width={RW+1.2} height={RH+1.2} rx={0.8}
                           fill="none" stroke="#ffffff" strokeWidth={0.2} strokeOpacity={0.6}
